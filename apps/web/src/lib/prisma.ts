@@ -8,9 +8,11 @@ const prismaClientSingleton = () => {
     process.env.DATABASE_URL ||
     "postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
-  // En desarrollo local o entorno Node.js estándar, usamos el adaptador nativo pg
-  // para evitar errores de WebSockets de Neon y cumplir con el tipo de motor "client"
-  if (process.env.NODE_ENV === "development" || !process.env.VERCEL) {
+  const isNeon = connectionString.includes("neon.tech")
+
+  // En desarrollo local o entorno Node.js estándar, o si no es una base de datos Neon (como Supabase),
+  // usamos el adaptador nativo pg para cumplir con el tipo de motor "client".
+  if (process.env.NODE_ENV === "development" || !process.env.VERCEL || !isNeon) {
     const pool = new Pool({ connectionString })
     const adapter = new PrismaPg(pool)
     return new PrismaClient({ adapter })

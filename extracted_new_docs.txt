@@ -1,0 +1,1707 @@
+
+================================================================================
+FILE: correcionnueva_Modulo1_Definitivo (1).docx
+================================================================================
+
+📋 Resumen Ejecutivo
+Antigravity es una plataforma SaaS de reservas para restaurantes construida sobre Next.js 14 App Router, Cal.com self-hosted y una arquitectura moderna. Este documento cubre el Módulo 1: el sistema de onboarding self-service que permite a los restaurantes configurarse de forma autónoma en menos de 15 minutos.
+Este documento incorpora TODAS las correcciones y decisiones definitivas de arquitectura, eliminando ambigüedades y errores del documento original. Está diseñado para ser entregado directamente a Claude Code o al equipo de desarrollo.
+
+1. Arquitectura General del Sistema
+1.1 Diagrama de Capas
+
+1.2 Flujo Principal de Onboarding
+
+2. Stack Tecnológico Definitivo
+2.1 Cambios vs. Propuesta Original (Con Justificaciones)
+
+2.2 Dependencias Exactas (package.json)
+
+3. Wizard de 5 Pasos — Implementación Detallada
+3.1 Arquitectura del Estado del Wizard
+
+
+3.2 Auto-Guardado (Cada 30 Segundos)
+
+3.3 Paso 1 — Información Básica
+
+3.4 Paso 2 — Horarios de Atención
+El componente más complejo del wizard. Soporta múltiples turnos por día (ej: almuerzo 12-15 + cena 19-23) y herencia de horarios entre días.
+
+3.5 Paso 3 — Capacidad y Mesas
+
+3.6 Paso 4 — Configuración de Pagos
+
+
+3.7 Paso 5 — Revisión y Publicación
+Resumen visual de toda la configuración antes de publicar. Al hacer click en 'Publicar':
+Cambiar status del restaurante de 'draft' a 'active' en PostgreSQL.
+Generar URL única: tuapp.com/[slug]
+Generar QR code automáticamente con la URL pública.
+Activar el número de WhatsApp Business si el plan lo incluye.
+Enviar email de bienvenida al restaurante (template en React Email).
+
+4. Características Avanzadas
+4.1 Editor Drag & Drop
+
+4.2 Subida de Imágenes (UploadThing)
+
+4.3 Selector de Colores con Eyedropper
+
+4.4 Generador de QR
+
+4.5 Dominio Personalizado
+
+
+5. Agente IA + WhatsApp Business API
+
+5.1 Arquitectura del Agente
+
+5.2 Flujo de una Reserva por WhatsApp
+Cliente envía: 'Hola, quiero reservar mesa para 4 personas este sábado'.
+WhatsApp API hace POST al webhook /api/webhooks/whatsapp.
+Verificar firma HMAC-SHA256 del header X-Hub-Signature-256.
+Sistema identifica el restaurante por el número de WhatsApp Business.
+Recuperar historial de conversación de Redis (si existe, TTL 24h).
+GPT-4o procesa con system prompt dinámico del restaurante.
+Agente llama a check_availability(date, party_size) → consulta Cal.com API.
+GPT-4o responde con opciones de horario disponibles.
+Cliente selecciona → agente llama a create_reservation() → Cal.com crea reserva.
+Guardar en PostgreSQL (tabla Reservation). Enviar email de confirmación vía Resend.
+WhatsApp responde: 'Tu reserva está confirmada para el sábado a las 8pm...'
+
+5.3 System Prompt Dinámico por Restaurante
+
+5.4 Guard contra Loop Infinito de Tool Calls
+
+5.5 Planes de Servicio para el Agente WhatsApp
+
+6. Arquitectura de Base de Datos
+6.1 Índices Requeridos (Agregar al Schema Prisma)
+
+6.2 Estrategia de Migrations
+Usar npx prisma migrate dev --name init en desarrollo.
+En producción: npx prisma migrate deploy (NUNCA migrate dev en producción).
+Backups automáticos diarios en Neon (incluidos en el plan gratuito).
+Usar prisma db seed para datos de prueba (restaurante demo).
+Nunca editar manualmente la base de datos de producción.
+
+7. Seguridad, Performance y Monitoreo
+7.1 Seguridad
+
+7.2 Performance
+
+7.3 Monitoreo y Observabilidad
+
+8. Roadmap de Implementación
+8.1 Fase 1: MVP (Semanas 1-3)
+8.2 Fase 2: Personalización (Semanas 4-6)
+8.3 Fase 3: IA y WhatsApp (Semanas 7-9)
+
+9. Variables de Entorno Completas (.env.local)
+
+10. Anti-Patrones Críticos — NO HACER
+
+11. Checklist de Calidad — Módulo 1
+11.1 Wizard de 5 Pasos
+Todos los campos tienen validación Zod con mensajes en español
+Auto-guardado funciona (verificar con Network tab)
+Botón 'Siguiente' deshabilitado si el paso tiene errores
+Navegación hacia atrás NO pierde datos ingresados
+Wizard recupera el progreso al recargar la página (localStorage)
+Funciona correctamente en móvil (probado en Chrome DevTools)
+Credenciales de pasarelas nunca en plain text (AES-256-GCM)
+Al publicar, se crea el calendario en Cal.com exitosamente
+calEventTypeId guardado en tabla TableType de PostgreSQL
+
+11.2 Editor Drag & Drop
+Secciones se reordenan y el orden persiste al guardar
+Undo/Redo funciona (Ctrl+Z y Ctrl+Y)
+El bloque de formulario de reservas no puede ocultarse
+Editor funciona en touch (móvil y tablet)
+
+11.3 Agente WhatsApp
+Webhook verifica firma X-Hub-Signature-256 de Meta
+Rate limiting: máximo 100 conversaciones/día por restaurante (plan Free)
+Guard de loop infinito: máximo 3 iteraciones de tool_calls
+max_tokens: 500 en cada request a OpenAI
+Agente no inventa disponibilidad (probado con fechas sin slots)
+System prompt generado dinámicamente con datos reales del restaurante
+Historial de conversación se limpia después de 24h (TTL Redis)
+Escalado a humano funciona cuando se solicita hablar con una persona
+Email de confirmación enviado al crear reserva por WhatsApp
+
+11.4 Seguridad y Performance
+Lighthouse Score > 90 en Mobile
+Bundle JS First Load < 200KB
+Rate limiting activo en rutas críticas (Upstash Ratelimit)
+Todos los webhooks verifican firma HMAC antes de procesar
+Cal.com es la única fuente de verdad para disponibilidad y reservas
+
+ANTIGRAVITY PLATFORM
+MÓDULO 1: ONBOARDING SELF-SERVICE
+Documento Técnico Definitivo — Listo para Producción
+Versión 2.0  •  Junio 2026  •  Correcciones Integradas
+ℹ️  DECISIONES DEFINITIVAS DE ARQUITECTURA
+Auth: Clerk (NO NextAuth.js). Un solo proveedor para toda la plataforma.
+Database: Neon (PostgreSQL serverless) + Prisma ORM.
+Almacenamiento wizard: localStorage para borrador temporal. PostgreSQL para persistencia real.
+Upload: UploadThing. Alternativa: Cloudinary si se requieren transformaciones de imagen en servidor.
+Cache/Queue: Upstash Redis (compatible con Vercel Edge Runtime y serverless). NO usar ioredis.
+Real-time: React Query polling 30s. NO Socket.io (incompatible con Vercel serverless).
+Cal.com: self-hosted en Railway. TODA operación de disponibilidad y reserva pasa por Cal.com API. Nunca escritura directa a BD.
+IA: OpenAI GPT-4o + Vercel AI SDK (streaming). LangChain.js para orquestación.
+Email: Resend + React Email.
+Monitoreo: Sentry (errores) + PostHog (analytics de producto).
+CAPA | TECNOLOGÍA / DETALLE
+Capa 1 — Frontend | Next.js 14 App Router + TypeScript + TailwindCSS + shadcn/ui
+Capa 2 — API Gateway | Next.js API Routes + tRPC (opcional para type-safety end-to-end)
+Capa 3 — Auth & Upload | Clerk (auth) + UploadThing (uploads) + Cloudinary opcional
+Capa 4 — Disponibilidad | Cal.com Self-Hosted (Railway) — fuente de verdad absoluta
+Capa 5 — IA & Mensajería | OpenAI GPT-4o + LangChain.js + WhatsApp Business API (Meta)
+Capa 6 — Base de Datos | Neon PostgreSQL + Prisma ORM + Upstash Redis
+Capa 7 — Infra / CDN | Vercel (frontend + API routes) + Cloudflare (CDN/DNS)
+Capa 8 — Monitoreo | Sentry (errores en tiempo real) + PostHog (funnels y analytics)
+ETAPA | DESCRIPCIÓN
+Paso 1 — Registro | Restaurante se registra con email/Google (Clerk). Se crea registro en BD con status=draft.
+Paso 2 — Wizard 5 pasos | Guiado paso a paso. Auto-guardado cada 30s en PostgreSQL. Borrador temporal en localStorage.
+Paso 3 — Integración Cal.com | Al completar el wizard, se crean calendario y Event Types en Cal.com vía API interna.
+Paso 4 — Personalización | Editor visual, colores, templates, QR. El restaurante ajusta su página pública.
+Paso 5 — Publicación | status cambia a 'active'. Se genera URL única y QR automáticamente.
+Paso 6 — Agente WhatsApp | El agente IA queda activo para recibir reservas 24/7 vía chat (plan Pro/Business).
+COMPONENTE | DECISIÓN FINAL | JUSTIFICACIÓN
+Auth | Clerk (reemplaza NextAuth.js) | Mejor DX, panel visual, MFA, social logins y webhook nativo. Ahorra 2-3 días de implementación. TODA la plataforma usa Clerk.
+Upload | UploadThing | DX excelente en Next.js. Usar Cloudinary si se requiere transformación de imágenes en servidor.
+Database | Neon (PostgreSQL serverless) | Compatible con Vercel, escala a cero, plan gratuito generoso. NO usar PostgreSQL local.
+Cache / Queue | Upstash Redis | REQUERIDO. Compatible con Vercel Edge Runtime (NO ioredis). Rate limiting, sessions, queue de WhatsApp, cache.
+Real-time | React Query polling 30s | Socket.io NO funciona en Vercel serverless. Para dashboard real-time avanzado: Pusher (Módulo 3).
+Cal.com | Self-hosted en Railway | Control total. TODA consulta de disponibilidad y creación de reserva pasa por Cal.com API. Nunca escritura directa a BD.
+IA Backend | OpenAI GPT-4o + Vercel AI SDK | GPT-4o para el agente de reservas. Vercel AI SDK simplifica el streaming de respuestas.
+Emails | Resend + React Email | Transaccionales. DX excelente, simple de implementar.
+Monitoreo | Sentry + PostHog | Sentry para errores. PostHog para analytics de producto (funnels del wizard, tasa de completación).
+Forms | React Hook Form + Zod | 100% correcto. No cambiar.
+DnD | @dnd-kit | 100% correcto. No cambiar.
+# Framework & UI
+npm install next@14 react@18 typescript tailwindcss
+npm install @shadcn/ui framer-motion
+
+# Forms & Validation
+npm install react-hook-form zod @hookform/resolvers
+
+# Base de Datos
+npm install @prisma/client prisma
+
+# Auth & Upload
+npm install @clerk/nextjs uploadthing @uploadthing/react
+
+# DnD & UI Extras
+npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+npm install react-colorful react-easy-crop qrcode.react
+
+# IA & WhatsApp
+npm install openai ai langchain @langchain/openai @langchain/community
+
+# Cache & Queue (SOLO Upstash — NO ioredis)
+npm install @upstash/redis @upstash/ratelimit bullmq
+
+# Email & Monitoreo
+npm install resend @sentry/nextjs posthog-js
+
+# PDF & QR
+npm install jspdf html2canvas node-qrcode
+
+# Teléfono & Compresión
+npm install libphonenumber-js browser-image-compression
+⚠️  ANTI-PATRÓN CRÍTICO A EVITAR
+NO usar localStorage para guardar la configuración definitiva del wizard.
+localStorage es SOLO para el borrador temporal del paso activo.
+Toda la información confirmada (al hacer click en 'Siguiente') se persiste en PostgreSQL vía la API.
+localStorage sirve de fallback si el usuario cierra accidentalmente la pestaña sin guardar.
+// store/wizardStore.ts
+interface WizardStore {
+  currentStep: 1 | 2 | 3 | 4 | 5;
+  restaurantId: string | null;
+  basicInfo: BasicInfoData | null;
+  schedules: ScheduleData[];
+  tableTypes: TableTypeData[];
+  paymentSettings: PaymentData | null;
+  isDirty: boolean;           // cambios sin guardar en el servidor
+  lastSaved: Date | null;
+  isAutoSaving: boolean;
+  // Actions
+  setStep: (step: number) => void;
+  updateBasicInfo: (data: Partial<BasicInfoData>) => void;
+  autoSave: () => Promise<void>;
+}
+
+// Persistencia: localStorage para borrador temporal ÚNICAMENTE
+// Usar persist middleware de Zustand con storage: createJSONStorage(() => localStorage)
+// Al confirmar cada paso: POST /api/wizard/[restaurantId]/step-[n]
+// hooks/useWizardAutoSave.ts
+useEffect(() => {
+  if (!isDirty) return;
+  const timer = setInterval(async () => {
+    if (isDirty) await autoSave();  // POST al servidor
+  }, 30_000);
+  return () => clearInterval(timer);
+}, [isDirty, autoSave]);
+
+// SIEMPRE guardar al cambiar de paso
+const goToNextStep = async () => {
+  const valid = await trigger();  // validación Zod del paso actual
+  if (!valid) return;
+  await saveCurrentStep();        // POST a la API
+  setStep(currentStep + 1);
+};
+CAMPO | IMPLEMENTACIÓN
+nombre | Texto, requerido, max 100 chars. Validar unicidad de slug al salir del campo (onBlur → GET /api/restaurants/check-slug).
+nit | Validar formato colombiano (9 dígitos + dígito verificador) o formato internacional.
+tipo | Select con 5 opciones: Restaurante, Bar, Café, Fast Food, Otro. Afecta sugerencias de paleta de colores en Paso 4.
+descripción | Textarea max 250 chars. Mostrar contador en tiempo real (250 - chars).
+dirección | Google Places Autocomplete. Llenar ciudad y coordinates automáticamente.
+teléfono | libphonenumber-js. Default: Colombia (+57). Validar formato E.164. Mostrar bandera del país.
+email | Validar formato RFC 5322. Verificar disponibilidad (onBlur): GET /api/restaurants/check-email.
+redes sociales | Inputs opcionales. Si el usuario pega URL completa, extraer solo el handle automáticamente.
+✅  FUNCIONALIDAD CLAVE: Copia de Horarios
+Botón 'Aplicar a todos los días de semana' en Lunes — reduce configuración de 5 min a 30 seg.
+Dropdown 'Copiar horario de...' para copiar de un día a otro.
+CRÍTICO: Los horarios deben estar en formato ISO 8601 con timezone del restaurante.
+Sincronizar automáticamente con Cal.com al guardar el Paso 2.
+Timezone del restaurante se obtiene de Google Places (al ingresar la dirección en Paso 1).
+❌  INTEGRACIÓN CRÍTICA CON CAL.COM — Sin esto el sistema NO funcionará
+Al crear un tipo de mesa, llamar INMEDIATAMENTE a la API de Cal.com:
+⚠️  SEGURIDAD OBLIGATORIA: Encriptación de Credenciales
+NUNCA guardar API keys de pasarelas en plain text en la BD.
+Encriptar con AES-256-GCM antes de guardar. La key de encriptación debe estar en variable de entorno ENCRYPTION_KEY.
+PASARELA | IMPLEMENTACIÓN
+Wompi (Colombia — principal) | API pública colombiana. Integrar SDK oficial. Webhook: POST /api/webhooks/wompi. Verificar firma HMAC-SHA256.
+Stripe (mercado internacional) | Usar Stripe.js en cliente. Webhook: POST /api/webhooks/stripe. Verificar con stripe.webhooks.constructEvent().
+PayU (LATAM) | Popular en LATAM. Integrar como opción terciaria.
+ePayco (Colombia alternativa) | SDK: @epayco/epayco-js en npm.
+// Usar @dnd-kit EXCLUSIVAMENTE. Implementar con DndContext + SortableContext.
+// El estado de la UI se guarda en el campo 'layout' (JSON) en tabla Restaurant.
+
+// UNDO/REDO con patrón Command:
+import { useUndoable } from 'use-undoable';  // 2KB, zero dependencies
+
+const [sectionState, setSectionState, { undo, redo }] = useUndoable(initialState);
+// Ctrl+Z → undo() | Ctrl+Y / Ctrl+Shift+Z → redo()
+// Limitar historial a 50 estados para no saturar memoria.
+
+// REGLA: El bloque de formulario de reservas NO puede ocultarse ni moverse al último lugar.
+// Verificar esto en el hook de validación antes de guardar el layout.
+// app/api/uploadthing/core.ts
+export const ourFileRouter = {
+  restaurantLogo: f({ image: { maxFileSize: '2MB', maxFileCount: 1 } })
+    .middleware(({ req }) => auth(req))
+    .onUploadComplete(async ({ metadata, file }) => {
+      // Comprimir ANTES del upload usando browser-image-compression (client-side)
+      // Generar thumbnail con sharp en el servidor
+      await db.restaurant.update({ where: { id: metadata.restaurantId },
+        data: { logoUrl: file.url } });
+    }),
+  restaurantBanner: f({ image: { maxFileSize: '5MB', maxFileCount: 1 } })...
+  restaurantGallery: f({ image: { maxFileSize: '3MB', maxFileCount: 10 } })...
+  dishPhotos: f({ image: { maxFileSize: '2MB', maxFileCount: 20 } })...
+} satisfies FileRouter;
+
+// Crop editor: usar react-easy-crop + getCroppedImg utility
+// Comprimir antes del upload: browser-image-compression en el cliente
+// El eyedropper requiere un servidor proxy para evitar CORS
+// Endpoint: POST /api/colors/extract  { url: 'https://restaurante.com' }
+
+// Flujo completo:
+// 1. Usuario ingresa URL del restaurante
+// 2. Servidor hace fetch de la página y extrae imágenes
+// 3. node-colorthief: ColorThief.getPalette(imagen, 6)
+// 4. Retornar 6 colores ordenados por prominencia
+// 5. Click en color → se aplica como primary/secondary/accent
+// 6. Validar contraste WCAG AA automáticamente al aplicar (ratio 4.5:1)
+
+// ALTERNATIVA más confiable: Analizar el logo si ya fue subido en Paso 1
+// Cachear paletas en Upstash Redis con TTL 24h
+FORMATO | IMPLEMENTACIÓN
+PNG 300 DPI | canvas.toDataURL('image/png'). Escalar el canvas 3x antes de exportar.
+SVG vectorial | qrcode.toString(url, {type: 'svg'}). Incrustar logo con elemento SVG.
+PDF A4 | jsPDF + html2canvas del template de impresión. Generar en /api/qr/download.
+ZIP múltiples mesas | JSZip en servidor. Generar QR por mesa e incluir en ZIP con nombres descriptivos.
+ℹ️  OPCIÓN A — Recomendada: Vercel API
+
+ℹ️  OPCIÓN B — Alternativa: Cloudflare + Next.js Middleware
+
+ℹ️  ⭐ DIFERENCIADOR PRINCIPAL DE ANTIGRAVITY
+Esta característica es la más importante para posicionar Antigravity a la vanguardia en 2026.
+OpenTable y Precompra.com NO tienen agentes de WhatsApp con IA.
+El 78% de los colombianos prefieren WhatsApp para comunicarse con negocios.
+Un agente IA disponible 24/7 puede gestionar el 90% de las reservas sin intervención humana.
+COMPONENTE | DETALLE
+Modelo IA | GPT-4o (OpenAI). Mejor para seguir instrucciones complejas y mantener contexto de conversación.
+Orquestador | LangChain.js. Maneja el ciclo ReAct (Razonar → Actuar → Observar).
+Mensajería | WhatsApp Business API (Meta). Plan gratuito: 1.000 conversaciones/mes. Luego ~$0.01-0.05/conversación.
+Webhook | POST /api/webhooks/whatsapp. Verificar firma X-Hub-Signature-256 de Meta OBLIGATORIAMENTE.
+Estado | Upstash Redis. Historial de conversación por número de teléfono (TTL 24h).
+Tools del Agente | check_availability, create_reservation, cancel_reservation, get_menu_info, send_confirmation.
+Rate Limiting | Upstash Ratelimit: 100 conversaciones/día por restaurante en plan Free.
+Loop Guard | Máximo 3 iteraciones de tool_calls por mensaje. Si supera: enviar mensaje de fallback.
+// lib/buildSystemPrompt.ts
+async function buildSystemPrompt(restaurantId: string): Promise<string> {
+  // Cachear en Redis con TTL 10 minutos
+  const cached = await redis.get(`restaurant:${restaurantId}:system-prompt`);
+  if (cached) return cached as string;
+
+  const restaurant = await db.restaurant.findUnique({
+    where: { id: restaurantId },
+    include: { schedules: true, tableTypes: true }
+  });
+
+  const prompt = `Eres el asistente virtual de ${restaurant.nombre}, un ${restaurant.tipo}
+ubicado en ${restaurant.ciudad}.`,
+
+PERSONALIDAD: ${restaurant.agentPersonality ?? 'amigable y profesional'}
+
+HORARIOS: ${formatSchedules(restaurant.schedules)}
+
+MESAS DISPONIBLES:
+${restaurant.tableTypes.map(t => `- ${t.nombre}: ${t.minCapacity}-${t.maxCapacity} personas`).join('\n')}
+
+REGLAS ESTRICTAS:
+- Responde en español (o el idioma del cliente si escribe en otro idioma).
+- NUNCA inventes disponibilidad. USA SOLO la herramienta check_availability.
+- Para grupos de +${restaurant.maxPartySize}: solicitar contacto directo.
+- USA eventTypeId: ${restaurant.defaultEventTypeId} para consultar disponibilidad.`,
+
+  await redis.setex(`restaurant:${restaurantId}:system-prompt`, 600, prompt);
+  return prompt;
+}
+// lib/agentHandler.ts — CRÍTICO para control de costos
+let iterations = 0;
+const MAX_TOOL_CALLS = 3;
+
+while (currentResponse.choices[0].message.tool_calls && iterations < MAX_TOOL_CALLS) {
+  // Procesar tool_calls
+  const toolResults = await processToolCalls(currentResponse.choices[0].message.tool_calls);
+  messages.push(...toolResults);
+  iterations++;
+  currentResponse = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages,
+    max_tokens: 500,  // Respuestas de reserva no necesitan más
+    tools: AGENT_TOOLS,
+  });
+}
+
+if (iterations >= MAX_TOOL_CALLS) {
+  await sendWhatsAppMessage(phone, '¿Puedo ayudarte de otra manera?');
+  return;
+}
+PLAN | CARACTERÍSTICAS
+Free | Página web + QR + widget embebible. Sin agente WhatsApp.
+Pro ($29/mes) | Todo Free + Agente WhatsApp IA + hasta 500 conversaciones/mes.
+Business ($79/mes) | Todo Pro + múltiples números WhatsApp + analytics avanzados + integración POS.
+// schema.prisma — Índices de performance obligatorios
+
+model Restaurant {
+  // ... campos ...
+  @@index([userId])
+  @@index([status])
+  @@index([city])
+}
+
+model Reservation {
+  id              String    @id @default(uuid())
+  restaurantId    String
+  calBookingId    String    @unique  // ID de Cal.com
+  calBookingUid   String    @unique  // UID público de Cal.com (usar para operaciones API)
+  clientName      String
+  clientEmail     String
+  clientPhone     String?
+  partySize       Int
+  date            DateTime
+  duration        Int                // minutos
+  tableTypeId     String?
+  status          String    @default('confirmed')
+  // confirmed | cancelled | no_show | completed
+  depositPaid     Decimal?  @db.Decimal(10, 2)
+  depositStatus   String?   // pending | paid | refunded
+  source          String    @default('web')
+  // web | whatsapp | widget | api | walkin | phone | manual
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  restaurant      Restaurant @relation(...)
+  @@index([restaurantId, date])
+  @@index([clientPhone])
+  @@index([status])
+}
+
+model WhatsAppAgent {
+  id               String   @id @default(uuid())
+  restaurantId     String   @unique
+  whatsappNumber   String   @unique
+  accessToken      String   // SIEMPRE encriptado con AES-256-GCM
+  phoneNumberId    String
+  isActive         Boolean  @default(false)
+  personality      String?
+  language         String   @default('es')
+  autoConfirm      Boolean  @default(true)
+  escalateToHuman  Boolean  @default(true)
+  humanPhone       String?
+  createdAt        DateTime @default(now())
+  restaurant       Restaurant @relation(...)
+}
+
+model Conversation {
+  id           String   @id @default(uuid())
+  restaurantId String
+  clientPhone  String
+  messages     Json     // array de mensajes
+  reservationId String?
+  status       String   @default('active')
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([restaurantId, clientPhone])
+  @@index([createdAt])  // para limpieza automática
+}
+
+model ConsentRecord {
+  id           String   @id @default(uuid())
+  clientEmail  String
+  restaurantId String
+  timestamp    DateTime @default(now())
+  policyVersion String
+  ipAddress    String
+  @@index([clientEmail, restaurantId])
+}
+ASPECTO | IMPLEMENTACIÓN
+API Auth | Todas las rutas /api protegidas con clerkMiddleware(). Verificar ownership: el usuario solo puede modificar SUS restaurantes.
+Rate Limiting | Upstash Ratelimit en rutas críticas: /api/auth (10 req/min), /api/restaurants (100 req/min), /api/webhooks/whatsapp (1000 req/min).
+Encriptación | Claves de pasarelas encriptadas con AES-256-GCM. Key en ENCRYPTION_KEY. NUNCA plain text en BD.
+CORS | Configurar en next.config.js. Solo permitir orígenes propios y dominios personalizados verificados.
+Webhooks | Verificar firma HMAC en TODOS los webhooks: Stripe, Wompi, Meta/WhatsApp, Cal.com. Rechazar sin firma.
+Input Sanitization | Zod valida todos los inputs. Sanitizar HTML con DOMPurify si se acepta rich text.
+OWASP Top 10 | Prisma previene SQL Injection. Next.js maneja CSRF. Revisar XSS en rich text.
+Cal.com (fuente verdad) | TODA operación de reserva pasa por Cal.com API. Nunca escritura directa a BD de Antigravity.
+ASPECTO | IMPLEMENTACIÓN
+Imágenes | Next.js Image component con sizes prop. Comprimir con browser-image-compression antes del upload.
+React Query | @tanstack/react-query para caching. staleTime: 5 * 60 * 1000 (5 minutos).
+Lazy Loading | dynamic() de Next.js para editor drag & drop y color picker (componentes pesados).
+Bundle Size | next build --analyze. Bundle JS debe ser < 200KB (First Load).
+Cache Redis | Cachear respuestas de Google Places API (TTL 1h). Cachear paletas de colores (TTL 24h). Cachear system prompts de IA (TTL 10min).
+DB Queries | select solo los campos necesarios. Evitar N+1 con include de Prisma.
+Streaming IA | Vercel AI SDK streaming para respuestas del agente (mejor UX).
+HERRAMIENTA | USO
+Sentry | Errores en tiempo real. Configurar en instrumentation.ts y next.config.js. Alertas por email/Slack.
+PostHog | Analytics de producto: tasa de completación del wizard, tiempo por paso, abandono. Funnels.
+Uptime | BetterUptime o UptimeRobot. Alertar si /api/health responde > 2 segundos.
+Logs | Vercel Logs (incluido en plan). Para producción avanzada: Axiom o Papertrail.
+Cal.com Metrics | Dashboard de Cal.com para métricas de reservas. Exportar a PostHog vía webhook.
+SEMANA | ENTREGABLES
+Semana 1 | Setup Next.js + TypeScript + TailwindCSS + shadcn/ui. Configurar Clerk + Neon + Prisma. Schema BD completo + primera migration. Wizard Paso 1 funcional con validaciones.
+Semana 2 | Wizard Pasos 2-4 (Horarios, Mesas, Pagos). Integración Cal.com API (crear calendarios y Event Types). Auto-guardado cada 30s.
+Semana 3 | Wizard Paso 5 (Revisión y Publicación). UploadThing para logo y banner. Página pública del restaurante (MVP sin personalización). Flujo de reserva básico funcionando end-to-end.
+SEMANA | ENTREGABLES
+Semana 4 | Editor Drag & Drop (secciones reordenables con @dnd-kit). Color picker + eyedropper desde URL. Templates pre-diseñados (5 templates).
+Semana 5 | Preview en tiempo real (split view + dispositivos). Galería de fotos con crop editor. Generador de QR (PNG, SVG, PDF).
+Semana 6 | Widget embebible (script + iframe). Importación desde Google Business. Dominios personalizados (vía Vercel API).
+SEMANA | ENTREGABLES
+Semana 7 | Integrar OpenAI SDK + LangChain. Crear tools del agente (check_availability, create_reservation, etc.). Pruebas de conversación en consola. Guard de loop infinito (max 3 iteraciones).
+Semana 8 | Meta WhatsApp Business API setup. Webhook /api/webhooks/whatsapp con verificación HMAC. Historial de conversaciones en Redis. Primer flujo de reserva completo por WhatsApp.
+Semana 9 | Panel de configuración del agente en el wizard. Escalado a humano. Analytics de conversaciones. Rate limiting por restaurante. Tests de carga y optimización.
+# ─── AUTH (Clerk) ─────────────────────────────────────────────────────
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+
+# ─── BASE DE DATOS (Neon) ─────────────────────────────────────────────
+DATABASE_URL=postgresql://user:pass@neon.host/db?sslmode=require
+
+# ─── UPLOAD (UploadThing) ─────────────────────────────────────────────
+UPLOADTHING_SECRET=sk_live_...
+UPLOADTHING_APP_ID=...
+
+# ─── CAL.COM (self-hosted) ─────────────────────────────────────────────
+CALCOM_API_URL=https://cal.tudominio.com/api/v2
+CALCOM_API_KEY=...
+CALCOM_WEBHOOK_SECRET=...   # Para verificar firma de webhooks de Cal.com
+
+# ─── IA (OpenAI) ───────────────────────────────────────────────────────
+OPENAI_API_KEY=sk-...
+
+# ─── WHATSAPP BUSINESS API (Meta) ─────────────────────────────────────
+META_WHATSAPP_TOKEN=...
+META_PHONE_NUMBER_ID=...
+META_WEBHOOK_VERIFY_TOKEN=...
+META_APP_SECRET=...          # Para verificar X-Hub-Signature-256
+
+# ─── CACHE / QUEUE (Upstash — SOLO Upstash, NO ioredis) ───────────────
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+
+# ─── GOOGLE PLACES ────────────────────────────────────────────────────
+GOOGLE_PLACES_API_KEY=...
+
+# ─── PASARELAS DE PAGO ────────────────────────────────────────────────
+WOMPI_PUBLIC_KEY=pub_...
+WOMPI_PRIVATE_KEY=prv_...
+STRIPE_PUBLISHABLE_KEY=pk_...
+STRIPE_SECRET_KEY=sk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# ─── SEGURIDAD ────────────────────────────────────────────────────────
+ENCRYPTION_KEY=32-bytes-hex-string   # Para encriptar credenciales de pago en BD
+
+# ─── EMAIL (Resend) ───────────────────────────────────────────────────
+RESEND_API_KEY=re_...
+
+# ─── MONITOREO ────────────────────────────────────────────────────────
+SENTRY_DSN=https://...
+NEXT_PUBLIC_POSTHOG_KEY=phc_...
+
+# ─── APP URL ──────────────────────────────────────────────────────────
+NEXT_PUBLIC_APP_URL=https://tuapp.com
+
+# ─── VERCEL (para dominios personalizados) ────────────────────────────
+VERCEL_TOKEN=...             # Para agregar dominios vía Vercel API
+❌  ESTOS ERRORES PUEDEN COSTAR DÍAS DE RETRABAJO
+❌ NO usar localStorage para guardar configuración definitiva del wizard. Solo para borrador temporal.
+❌ NO guardar API keys de pasarelas en plain text en la BD. Encriptar con AES-256-GCM.
+❌ NO llamar a la API de Cal.com directamente desde el cliente. Toda comunicación va por Next.js API Routes.
+❌ NO usar Socket.io para real-time. Es incompatible con Vercel serverless. Usar React Query polling o Pusher.
+❌ NO usar ioredis. Usar EXCLUSIVAMENTE @upstash/redis (compatible con Edge Runtime).
+❌ NO implementar el agente de WhatsApp sin rate limiting. Un bug puede generar miles de llamadas a OpenAI en segundos.
+❌ NO saltarse la verificación de firma de webhooks de Meta/Wompi/Stripe/Cal.com.
+❌ NO escribir directamente a la BD de Antigravity para crear/modificar reservas. SIEMPRE pasar por Cal.com API primero.
+❌ NO hardcodear valores como account IDs de Chatwoot o event type IDs. Siempre dinámico desde BD.
+Documento Técnico Definitivo — Módulo 1 de Antigravity  •  Versión 2.0  •  Junio 2026
+Incorpora todas las correcciones del documento de revisión. Listo para Claude Code y equipo de desarrollo.
+
+
+================================================================================
+FILE: correcionnueva_Modulo2_Definitivo.docx
+================================================================================
+
+📋 Resumen Ejecutivo
+El Módulo 2 de Antigravity es la cara visible del sistema: la página pública donde los clientes finales realizan sus reservas. Es el módulo de mayor impacto en la experiencia del usuario y determina directamente la tasa de conversión del restaurante.
+Implementa un flujo de 6 pasos (Sede → Personas → Fecha/Hora → Datos → Pago → Confirmación) completamente integrado con Cal.com como backend de disponibilidad y las pasarelas de pago configuradas en el Módulo 1.
+
+1. Arquitectura del Flujo y Estado Global
+1.1 Diagrama de Flujo Completo (6 Pasos)
+
+1.2 Estado Global con Zustand + sessionStorage
+
+
+1.3 Routing entre Pasos (Next.js App Router)
+Usar Next.js App Router con URL params para que cada paso tenga su propia URL. Esto permite que el botón 'Atrás' del navegador funcione correctamente y que se pueda compartir un paso específico.
+
+
+2. Paso 0 — Selección de Sede
+2.1 Lógica de Navegación Automática
+
+2.2 Componentes del Selector de Sede
+
+2.3 Carga Paralela de Disponibilidad
+
+3. Paso 1 — Número de Personas y Tipo de Evento
+3.1 Selector de Personas: UX Optimizada
+
+3.2 Tipo de Evento y Chips Inteligentes
+
+El tipo de evento se envía a Cal.com en el campo metadata.eventType. El restaurante puede verlo en su dashboard y prepararse con anticipación.
+
+3.3 Chips de Solicitudes Especiales
+
+4. Paso 2 — Calendario y Horarios Disponibles
+4.1 Arquitectura con React Query
+
+
+4.2 Calendario con react-day-picker + Indicadores Visuales
+
+4.3 Grid de Time Slots — Estados Visuales
+
+4.4 Sugerencias Automáticas cuando No Hay Disponibilidad
+
+5. Paso 3 — Datos del Cliente (Guest-First)
+5.1 Filosofía Guest-First
+
+5.2 Detección de Email Existente (onBlur)
+
+5.3 Auth Social: Clerk en Modo Optional Sign-In
+
+5.4 Validaciones del Formulario
+
+6. Paso 4 — Confirmación y Pago
+6.1 Resumen Editable sin Perder Estado
+
+6.2 Integración de Pasarelas de Pago
+
+6.3 Máquina de Estados del Procesamiento — Saga Pattern
+
+6.4 Estados de la UI Durante el Procesamiento
+
+6.5 Seguridad del Formulario de Pago
+
+7. Manejo de Race Conditions con Redis
+7.1 Problema: Dos Usuarios Reservan el Mismo Slot
+
+8. Paso 5 — Éxito y QR de Confirmación
+8.1 Experiencia de Confirmación
+
+8.2 Agregar al Calendario
+
+8.3 Acciones Post-Confirmación
+
+9. Integración Completa con Cal.com
+9.1 Mapa de Endpoints Cal.com
+
+9.2 Mapping Completo de Datos: Antigravity → Cal.com
+
+10. Notificaciones: Email, WhatsApp y Recordatorios
+10.1 Arquitectura de Notificaciones con BullMQ
+Las notificaciones se envían de forma ASÍNCRONA usando BullMQ (queue compartida con Módulo 2) para no bloquear la respuesta de la API. El webhook de Cal.com dispara los jobs.
+
+
+10.2 Templates de WhatsApp Business API
+
+10.3 Email de Confirmación con React Email + Resend
+
+11. Performance, Accesibilidad y Testing
+11.1 Métricas de Performance Objetivo
+
+11.2 Optimizaciones Clave
+
+11.3 Accesibilidad WCAG 2.1 AA
+
+11.4 Estrategia de Testing
+
+
+12. SEO de la Página de Reservas
+
+13. Variables de Entorno Adicionales — Módulo 2
+
+14. Tabla Resumen de Cambios vs. Propuesta Original
+
+15. Checklist de Lanzamiento — Módulo 2
+15.1 Funcionalidad Core
+Flujo completo funciona end-to-end sin pago (restaurante sin depósito).
+Flujo completo funciona con pago (Wompi test mode) — saga pattern implementado.
+Sede única auto-salta Paso 0 (ejecutado en servidor, sin flash de UI).
+Cal.com crea la reserva y envía su propio email de confirmación.
+Webhook de Cal.com (BOOKING_CREATED) recibe eventos y dispara jobs BullMQ.
+QR se genera correctamente y la descarga funciona.
+Agregar a Google Calendar y descarga .ics funcionan correctamente.
+Botón 'Editar' en el resumen navega sin perder el estado del flujo.
+Sugerencias automáticas aparecen cuando la fecha está llena.
+
+15.2 Casos Borde
+Slot se llena mientras el usuario está en el Paso 3 (entre ver disponibilidad y pagar).
+Pago falla (tarjeta declinada) → mensaje específico de la pasarela visible.
+Cal.com está caído → el pago NO se procesa, se muestra error claro.
+Usuario intenta ir al Paso 4 directamente via URL sin completar el Paso 3.
+Dos usuarios intentan reservar el mismo slot simultáneamente → Redis lock previene doble-booking.
+Pago procesado + Cal.com falla → reembolso automático en pasarela.
+
+15.3 Seguridad
+Webhook de Cal.com verifica firma HMAC-SHA256 (CALCOM_WEBHOOK_SECRET).
+Webhook de Wompi/Stripe verifica firma HMAC antes de procesar.
+Datos de tarjeta NUNCA pasan por el servidor de Antigravity (solo tokens de pasarela).
+Rate limiting en POST /api/bookings: máximo 5 reservas por IP por hora.
+Consentimiento de Habeas Data registrado en tabla ConsentRecord con IP y timestamp.
+
+15.4 Performance y Accesibilidad
+Lighthouse Score > 90 en Mobile (sin conexión a Cal.com real en el test).
+First Load JS < 180KB (verificar con next build --analyze).
+API de disponibilidad responde < 500ms p95.
+Flujo completo navegable 100% con teclado (Tab + Enter + Escape).
+Todos los time slots tienen aria-label descriptivo.
+Contraste de colores del restaurante verificado (ratio 4.5:1 mínimo).
+
+15.5 Notificaciones
+Plantillas de WhatsApp Business aprobadas por Meta ANTES del lanzamiento.
+Email de confirmación llega con QR incrustado y link de cancelación.
+Reminder 24h se programa correctamente al crear la reserva.
+Reminder 2h por WhatsApp funciona con la dirección correcta.
+Feedback por email se programa 2h después de la reserva (no inmediatamente).
+
+ANTIGRAVITY PLATFORM
+MÓDULO 2: SISTEMA DE RESERVAS
+Frontend Público del Cliente — Documento Técnico Definitivo
+Versión 2.0  •  Junio 2026  •  Correcciones integradas de revisión técnica
+⭐  CONEXIÓN CON MÓDULO 1 — Todo lo configurado allí se consume aquí
+Horarios del Paso 2 del Módulo 1 → controlan qué días/horas aparecen disponibles.
+Tipos de mesa del Paso 3 → determinan la capacidad máxima seleccionable.
+Pasarelas de pago del Paso 4 → activan el formulario de pago en este módulo.
+Branding y templates del Paso 5 → dan la apariencia visual de esta página.
+Cal.com configurado en Módulo 1 → es el motor de disponibilidad en tiempo real.
+Clerk (Módulo 1) → auth en modo 'optional sign-in' para clientes; fuente de usuarios.
+PASO | DESCRIPCIÓN Y LÓGICA
+PASO 0
+Selección de Sede | Solo si el restaurante tiene múltiples sucursales. Si hay una sola sede: auto-seleccionar y redirigir automáticamente a Paso 1. Ejecutar la lógica en el SERVIDOR para evitar flash de pantalla vacía.
+PASO 1
+Personas y Evento | Selector visual de 1-8 personas + botón '+ Más' para grupos grandes. Tipo de evento (cena, cumpleaños, etc.) y solicitudes especiales con chips inteligentes.
+PASO 2
+Fecha y Horario | Calendario con indicadores de disponibilidad (verde/amarillo/rojo). Grid de time slots por turno. Sugerencias automáticas si la fecha está llena.
+PASO 3
+Datos del Cliente | Formulario guest-first (sin crear cuenta obligatoriamente). Detección de email existente (onBlur). Login social vía Clerk opcional.
+PASO 4
+Pago y Confirmación | Resumen completo + formulario de pago (Wompi/Stripe) si el restaurante requiere depósito. Flujo atómico con Saga pattern.
+PASO 5
+Éxito y QR | Animación de checkmark + QR escaneable + opciones de calendario. Envío automático de email + WhatsApp de confirmación.
+ℹ️  DECISIÓN DEFINITIVA: sessionStorage (NO localStorage)
+sessionStorage es la elección correcta para el flujo de reserva porque:
+Una reserva NO debe 'recordarse' al reabrir el navegador (contiene datos personales sensibles).
+Permite recuperarse de un refresh accidental durante el flujo sin perder el progreso.
+Se limpia automáticamente al cerrar la pestaña. Sin datos obsoletos.
+Cada pestaña tiene su propio estado (el usuario puede tener 2 reservas simultáneas).
+Implementar: persist middleware de Zustand con storage: createJSONStorage(() => sessionStorage)
+// store/bookingStore.ts
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+interface BookingStore {
+  // Estado del flujo
+  currentStep: 0 | 1 | 2 | 3 | 4 | 5;
+  selectedBranch: Branch | null;
+  partySize: number;
+  eventType: string;
+  specialRequests: string;
+  selectedDate: string | null;     // ISO date string
+  selectedTime: string | null;     // 'HH:MM'
+  customer: CustomerData | null;
+  payment: PaymentData | null;
+  bookingId: string | null;        // generado en Paso 4
+  confirmationCode: string | null; // del Cal.com
+  // Actions
+  setStep: (step: number) => void;
+  setBranch: (branch: Branch) => void;
+  setPartySize: (n: number) => void;
+  reset: () => void;
+}
+
+export const useBookingStore = create<BookingStore>()(persist(
+  (set) => ({ /* implementación */ }),
+  { name: 'booking-state', storage: createJSONStorage(() => sessionStorage) }
+));
+URL / PASO | DESCRIPCIÓN
+/[slug]/reservar/sede    (Paso 0) | Solo si múltiples sedes. Si sede única: auto-redirect a /personas en el servidor.
+/[slug]/reservar/personas    (Paso 1) | Número de personas, tipo de evento, solicitudes especiales.
+/[slug]/reservar/fecha    (Paso 2) | Calendario y grid de time slots.
+/[slug]/reservar/datos    (Paso 3) | Formulario de datos del cliente (guest-first).
+/[slug]/reservar/pago    (Paso 4) | Resumen + formulario de pago (condicional).
+/[slug]/reservar/confirmacion    (Paso 5) | QR + opciones de calendario + acciones post-reserva.
+Middleware de protección | Verificar que los pasos anteriores estén completos en sessionStorage. Si no: redirigir al primer paso incompleto.
+🔴  REGLA CRÍTICA: Manejo de sede única — ejecutar en SERVIDOR
+
+COMPONENTE | DESCRIPCIÓN E IMPLEMENTACIÓN
+BranchSelector | Grid de cards con todas las sedes. Props: branches[], onSelect callback, userLocation? (solo si el usuario hizo click en 'Cerca de mí').
+BranchCard | Card individual: foto 16:9, nombre, dirección, distancia, rating, badge abierto/cerrado.
+BranchFilters | Filtros: 'Cerca de mí', 'Abierto ahora', 'Disponibilidad hoy'. Usar URL search params para persistencia.
+DistanceBadge | Muestra 'X km' o 'X m'. Usar geolib.getDistance(). Pedir permiso de geolocalización SOLO si el usuario hace click en 'Cerca de mí'. Nunca pedir permiso automáticamente al cargar la página.
+OpenStatusBadge | Verde 'Abierto hasta las Xpm' o rojo 'Cerrado'. Calcular del lado CLIENTE con la timezone de la sede (date-fns-tz).
+// Cargar disponibilidad de TODAS las sedes en paralelo
+const branchesWithAvailability = await Promise.all(
+  branches.map(async (branch) => {
+    const availability = await getAvailabilityToday(branch.id);
+    return { ...branch, hasAvailabilityToday: availability.hasSlots };
+  })
+);
+
+// React Query: staleTime: 5 * 60 * 1000 (5 minutos)
+// refetchOnWindowFocus: true (revalidar al volver a la pestaña)
+ELEMENTO | IMPLEMENTACIÓN
+Botones 1-8 | Grid de botones 48x48px mínimo. Solo el número. El seleccionado tiene fondo con color primario del restaurante.
+Botón '+ Más' | Abre input numérico con stepper (+/-). Max: capacidad máxima del restaurante (del Módulo 1).
+Mensaje dinámico | '1-2: Mesa íntima'  |  '3-6: Mesa para grupo'  |  '7-10: Mesa grande'  |  '+10: Evento especial'.
+Límite superado | NO mostrar error agresivo. Mostrar: 'Para grupos de +X personas, contáctanos' con botón de WhatsApp.
+Impacto en caché | Al cambiar el número de personas, invalidar el caché de disponibilidad (los slots dependen del tamaño del grupo).
+TIPO DE EVENTO | COMPORTAMIENTO ESPECIAL
+🍽️  Cena casual | Default, pre-seleccionado. Sin campo adicional.
+💑  Cena romántica | Sin campo adicional.
+🎂  Cumpleaños | Trigger especial: preguntar '¿Para quién es el cumpleaños?' (campo adicional de texto).
+🥂  Aniversario | Trigger especial: preguntar '¿Desea decoración especial?' (checkbox).
+💼  Reunión de negocios | Sin campo adicional.
+🎉  Celebración especial | Sin campo adicional.
+👨‍👩‍👧  Comida familiar | Sin campo adicional.
+✏️  Otro | Input libre, max 50 chars.
+// Lógica de concatenación de chips — NO reemplazar, concatenar
+const addChip = (chip: string) => {
+  const current = specialRequests.trim();
+  const newText = current ? `${current}, ${chip}` : chip;
+  setSpecialRequests(newText.slice(0, 500));  // max 500 chars
+};
+
+// Chips predefinidos:
+// 'Silla alta para bebé'    → agregar directamente
+// 'Accesibilidad wheelchair' → agregar directamente
+// 'Mesa tranquila'           → agregar directamente
+// 'Vista panorámica'         → agregar directamente
+// 'Alergias alimentarias'    → abrir mini-form: 'Especifica las alergias: ___'
+ℹ️  DECISIÓN DEFINITIVA: React Query (NO SWR)
+queryKey incluye [branchId, date, partySize] → caché automático por combinación.
+Cuando el usuario cambia partySize en Paso 1, la query se invalida automáticamente.
+prefetchQuery para pre-cargar los próximos 3 días mientras el usuario ve el mes.
+staleTime: 60 * 1000  (1 minuto: la disponibilidad puede cambiar).
+refetchInterval: 30 * 1000  (refrescar cada 30s si la página está activa).
+// hooks/useAvailability.ts
+const { data, isLoading, error } = useQuery({
+  queryKey: ['availability', branchId, selectedDate, partySize],
+  queryFn: () => fetchSlots({ branchId, date: selectedDate, partySize }),
+  staleTime: 60_000,         // 1 minuto
+  refetchInterval: 30_000,   // cada 30 segundos si la pestaña está activa
+  enabled: !!selectedDate,   // solo consultar si hay fecha seleccionada
+});
+
+// Pre-cargar los próximos 3 días en background
+useEffect(() => {
+  if (!selectedDate) return;
+  [1, 2, 3].forEach(offset => {
+    const nextDate = addDays(new Date(selectedDate), offset);
+    queryClient.prefetchQuery({
+      queryKey: ['availability', branchId, format(nextDate, 'yyyy-MM-dd'), partySize],
+      queryFn: () => fetchSlots({ branchId, date: format(nextDate, 'yyyy-MM-dd'), partySize }),
+    });
+  });
+}, [selectedDate, partySize, branchId]);
+ASPECTO | IMPLEMENTACIÓN
+DayContent personalizado | Punto de color debajo del número: verde (>50% disponible), amarillo (20-50%), rojo (<20%), gris (cerrado/lleno).
+Días deshabilitados | Días pasados + días marcados como 'cerrado' en los horarios del Módulo 1. Calcular del lado cliente.
+Rango máximo | Configurable por restaurante (default 60 días). Campo maxAdvanceBookingDays en BD.
+Carga por mes | Al navegar de mes: UN solo request con startDate + endDate (no request por día).
+Botones rápidos | 'Hoy', 'Mañana', 'Este fin de semana'. Verificar que no estén deshabilitados antes de seleccionar.
+Skeleton | Mostrar skeleton del calendario mientras carga el mes. NO bloquear el render del calendario base.
+ESTADO | COLOR / ESTILO | COMPORTAMIENTO | ARIA LABEL | BADGE
+Disponible | Blanco, borde gris | Clickable, hover con color primario | '[hora] disponible' | —
+Última mesa | Fondo amarillo suave | Clickable | '[hora] última mesa disponible' | 'Última mesa'
+Lleno | Gris claro, texto tachado | disabled, no interactivo | '[hora] no disponible' | —
+Seleccionado | Color primario restaurante | Checkmark visible + focus ring | '[hora] seleccionado' | ✓
+Happy Hour | Verde suave | Clickable | '[hora] happy hour disponible' | '🎉 X% dto'
+✅  UX CRÍTICA: Nunca dejar al usuario en un callejón sin salida
+Si la fecha seleccionada está llena, mostrar AUTOMÁTICAMENTE alternativas:
+Buscar el próximo día disponible (hasta 7 días adelante).
+Buscar el día anterior disponible (hasta 3 días atrás, si es futuro).
+Mostrar: 'No hay mesas para el viernes. ¿Qué tal el sábado a las 19:30?'
+Botón 'Ver esa fecha' → auto-selecciona la sugerencia.
+Botón 'Ver todas las fechas' → calendario con solo días verdes visibles.
+Este UX puede aumentar la tasa de conversión hasta un 40% (fuente: estudios de OpenTable).
+🔴  PRINCIPIO FUNDAMENTAL: El cliente NO debe crear cuenta para reservar
+La mayor barrera para reservar online es pedir crear una cuenta. Antigravity adopta Guest-First:
+El formulario de invitado es el PRIMER elemento visible, inmediatamente al cargar la página.
+El login social (Clerk) es SECUNDARIO: más abajo, más pequeño, con un divider 'o'.
+NO usar tabs ni toggles que oculten el formulario principal.
+La creación de cuenta es 100% opt-in y siempre POSTERIOR a la reserva.
+Benchmark:
+OpenTable: requiere cuenta → fricción alta.
+Precompra.com: permite invitado pero el UI no lo prioriza → confuso.
+Antigravity: invitado es el DEFAULT. Login es la excepción, no la regla.
+// Al salir del campo email → POST /api/customers/verify-email { email }
+
+// Resultado A — email nuevo:
+// → No hacer nada. El usuario continúa como invitado normalmente.
+// → Al final del paso, mostrar opcional: 'Guarda tu info → [Crear cuenta]'
+
+// Resultado B — email existente con cuenta Clerk:
+// → Banner: 'Ya tienes cuenta. ¿Ingresas? [Sí, iniciar sesión]'
+// → Si el usuario ignora el banner, puede continuar como invitado igualmente.
+
+// Resultado C — email que reservó antes como invitado:
+// → Pre-rellenar nombre y teléfono si existen en BD.
+// → Mostrar: 'Bienvenido de nuevo, [Nombre]' como confirmación sutil.
+ℹ️  DECISIÓN DEFINITIVA: Clerk para auth en módulo público (NO NextAuth.js)
+Usar Clerk en modo 'optional sign-in': componente <SignIn /> para el login modal.
+useUser() hook: si el usuario está logueado → pre-rellenar nombre/email automáticamente.
+Si no está logueado → mostrar formulario de invitado normalmente.
+Consistencia con el sistema de auth del Módulo 1 (panel de restaurantes).
+Un solo proveedor de auth para toda la plataforma.
+Los clientes que crean cuenta en Módulo 2 pueden ver su historial de reservas.
+Configuración: Clerk organization = restaurante. Customer = user sin org membership.
+CAMPO | REGLAS DE VALIDACIÓN
+Nombre | Min 2, max 100 chars. Trim automático. Capitalizar primera letra de cada palabra (CSS text-transform o JS).
+Email | Formato RFC 5322 vía Zod. Verificación de existencia en BD (onBlur, no en tiempo real para no saturar la API).
+Teléfono | libphonenumber-js. Default: Colombia (+57). Validar formato E.164. Mostrar bandera del país seleccionado.
+Privacidad | Checkbox requerido. El link abre en nueva pestaña (target='_blank'). No es bloqueable con adblock.
+Consentimiento Habeas Data | Registrar en tabla ConsentRecord: { clientEmail, restaurantId, timestamp, policyVersion, ipAddress } — obligatorio por Ley 1581 de Colombia.
+Autocomplete HTML | Todos los inputs con atributo autocomplete correcto: name, email, tel. Mejora UX en móvil.
+ℹ️  PATRÓN: Editar sin perder el progreso del flujo
+
+PASARELA | IMPLEMENTACIÓN
+Wompi (Colombia — principal) | Usar widget oficial de Wompi.js para el formulario de tarjeta. PCI DSS compliance incluido. El widget maneja la tokenización. NUNCA procesar números de tarjeta en el servidor de Antigravity.
+Stripe (internacional) | Usar @stripe/react-stripe-js + <CardElement>. Crear PaymentIntent en el servidor (POST /api/payments/stripe/intent). Confirmar con stripe.confirmCardPayment() en el cliente.
+PSE (Colombia) | Disponible vía Wompi. Redirige a la página del banco. Manejar redirect de vuelta con ?payment_status=approved/declined.
+Sin depósito | Mostrar solo el botón 'Confirmar reserva'. NO renderizar ningún componente de pago. Flujo más simple y rápido.
+❌  RIESGO CRÍTICO: Cobrar sin crear la reserva destruye la confianza
+El mayor riesgo: el pago se procesa pero Cal.com falla. El cliente paga pero no tiene reserva.
+SOLUCIÓN: Patrón Saga en POST /api/bookings/create-with-payment:
+ESTADO | DESCRIPCIÓN Y ACCIÓN
+idle | Estado inicial. Botón 'Pagar' habilitado.
+validating | Verificando disponibilidad del slot en tiempo real con Cal.com.
+processing_payment | Procesando el pago con Wompi/Stripe. Spinner visible.
+creating_booking | Creando la reserva en Cal.com y en BD.
+success | Reserva creada. Redirigir a Paso 5 (confirmación).
+error: slot ocupado | La mesa fue tomada mientras el usuario estaba en el formulario. Mostrar: 'Esta mesa acaba de ser tomada. Elige otro horario.' + recargar disponibilidad.
+error: pago fallido | Mostrar el mensaje específico de la pasarela (tarjeta declinada, fondos insuficientes, etc.).
+payment_refunded | El pago se procesó pero Cal.com falló. El sistema revirtió el cobro automáticamente.
+ASPECTO | IMPLEMENTACIÓN OBLIGATORIA
+PCI DSS | NUNCA procesar números de tarjeta en el servidor de Antigravity. Usar siempre widgets/SDKs de las pasarelas que tokenizan en su propia infraestructura.
+HTTPS | Obligatorio. Vercel lo provee automáticamente. Si dominio personalizado: verificar SSL activo.
+Idempotency Key | Generar un UUID único por intento de pago. Enviar al backend. Evita cobros dobles si el usuario hace doble-click.
+Redis Optimistic Lock | Al seleccionar un slot: SET slot:{branchId}:{date}:{time} 'userId' EX 300 NX. Previene que dos usuarios reserven el mismo slot simultáneamente.
+Timeout de pago | Si tarda más de 30 segundos: mostrar 'Esto está tomando más de lo normal...' y ofrecer reintentar.
+⚠️  Escenario: Usuario A y Usuario B ven disponible el slot 20:00 del viernes simultáneamente
+SOLUCIÓN: Verificación en dos fases con Redis Optimistic Lock:
+ELEMENTO | IMPLEMENTACIÓN
+Animación checkmark | SVG animado con framer-motion. Dibujar el checkmark progresivamente en 600ms. Color verde.
+Confetti | Opcional, configurable por restaurante. Usar canvas-confetti (1.6KB). SOLO para: Cumpleaños, Aniversario, Celebración especial.
+Código de reserva | Formato: #RES-AAAA-XXXXXX (RES + año + 6 chars alfanuméricos). Fácil de deletrear por teléfono.
+QR Code | Mínimo 200x200px. URL: /verify/{bookingId}. Nivel de corrección H (alta tolerancia a errores).
+Logo en QR | Logo del restaurante en el centro (excava el QR). Tamaño: 20% del QR.
+// Google Calendar — abrir en nueva pestaña
+const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE
+  &text=${encodeURIComponent('Reserva en ' + restaurant.name)}
+  &dates=${startISO}/${endISO}
+  &details=${encodeURIComponent(details)}
+  &location=${encodeURIComponent(branch.address)}`;
+
+// Apple Calendar / Outlook → generar archivo .ics
+// Servir desde: GET /api/bookings/{id}/calendar.ics
+// Content-Type: text/calendar; charset=utf-8
+// Content-Disposition: attachment; filename='reserva.ics'
+// IMPORTANTE: Formatear fechas en UTC. Incluir TZID del restaurante en el .ics.
+
+// Outlook Online
+const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?...`;
+ACCIÓN | IMPLEMENTACIÓN
+Descargar QR | canvas.toBlob() + URL.createObjectURL() + trigger descarga. Nombre: reserva-{codigo}.png
+Enviar por email | Botón → POST /api/bookings/{id}/send-email → muestra 'Email enviado ✓'.
+Compartir reserva | Web Share API (navigator.share) si disponible. Fallback: copiar texto al portapapeles.
+Apple/Google Wallet | FASE 2 — requiere configuración de certificados. Mostrar 'Próximamente' en MVP.
+Feedback del cliente | NO mostrar en pantalla de éxito (interrumpe). Enviar email 24h DESPUÉS de la reserva.
+OPERACIÓN | ENDPOINT CAL.COM v2
+Verificar disponibilidad | GET /api/v2/slots?eventTypeId={id}&start={date}&end={date}  → retorna slots disponibles por fecha.
+Crear reserva | POST /api/v2/bookings  con datos completos del cliente + metadata del restaurante.
+Cancelar reserva | DELETE /api/v2/bookings/{uid}  con motivo de cancelación.
+Reagendar | PATCH /api/v2/bookings/{uid}  con nueva fecha/hora.
+Webhook BOOKING_CREATED | Cal.com notifica a Antigravity → Antigravity escribe en tabla Reservation de PostgreSQL.
+Webhook BOOKING_CANCELLED | Cal.com notifica cancelación → actualizar status en BD + liberar lock en Redis.
+// POST /api/v2/bookings — payload completo
+{
+  eventTypeId: tableType.calEventTypeId,    // del Módulo 1 (tabla TableType)
+  start: `${date}T${time}:00`,              // ISO 8601
+  end: calculateEnd(start, avgReservationTime),
+  timeZone: branch.timezone,                // 'America/Bogota'
+  language: 'es',
+  responses: {
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+  },
+  metadata: {
+    restaurantId: restaurant.id,
+    branchId: branch.id,
+    partySize: partySize,
+    eventType: eventType,                   // 'birthday', 'romantic', etc.
+    specialRequests: specialRequests,
+    bookingSource: 'web' | 'whatsapp' | 'widget',
+    paymentId: paymentId || null,
+    antigravityBookingId: generatedId,      // UUID generado por Antigravity
+  },
+}
+
+// IMPORTANTE: Guardar calBookingId Y calBookingUid retornados por Cal.com
+// calBookingUid = identificador público para operaciones de la API (cancelar, reagendar)
+// Al recibir webhook BOOKING_CREATED de Cal.com:
+// Handler: POST /api/webhooks/calcom
+
+// 1. Verificar firma HMAC-SHA256 del webhook (OBLIGATORIO)
+// 2. Encolar jobs en BullMQ (misma queue del Módulo 1):
+
+await bookingQueue.add('send-confirmation-email',  { bookingId }, { delay: 0 });
+await bookingQueue.add('send-whatsapp-confirmation',{ bookingId }, { delay: 0 });
+await bookingQueue.add('send-reminder-24h',
+  { bookingId }, { delay: bookingDate - 24 * 60 * 60 * 1000 - Date.now() });
+await bookingQueue.add('send-reminder-2h',
+  { bookingId }, { delay: bookingDate - 2 * 60 * 60 * 1000 - Date.now() });
+await bookingQueue.add('request-feedback',
+  { bookingId }, { delay: bookingDate + 2 * 60 * 60 * 1000 - Date.now() });
+⚠️  Los mensajes outbound de WhatsApp DEBEN usar plantillas aprobadas por Meta
+Crear y aprobar ANTES del lanzamiento a producción. El proceso tarda 24-72 horas.
+Plantilla 1 — booking_confirmation:
+Plantilla 2 — booking_reminder_24h:
+Plantilla 3 — booking_reminder_2h:
+ASPECTO | DETALLE
+Librería | Resend + React Email. Crear componentes React que se compilan a HTML de email compatible.
+Contenido | Logo del restaurante, detalles de reserva, QR code (imagen base64 incrustada), botón 'Cancelar reserva', mapa estático.
+Personalización | Colores del email usan el branding del restaurante (primaryColor, secondaryColor del Módulo 1).
+Reminder 24h | Email + WhatsApp: 'Recordatorio: tu reserva en [nombre] es mañana a las [hora]. ¿Aún la confirmas?'
+Reminder 2h | Solo WhatsApp: 'Te esperamos en 2 horas. Dirección: [link Google Maps]'
+MÉTRICA | OBJETIVO | HERRAMIENTA
+LCP (Largest Contentful Paint) | < 2.5 segundos | Vercel Analytics
+FID / INP | < 100ms | Lighthouse
+CLS (Layout Shift) | < 0.1 | PageSpeed Insights
+Time to Interactive | < 3.5 segundos | Lighthouse
+Bundle JS (First Load) | < 180KB | next build --analyze
+API Availability Response | < 500ms p95 | Sentry Performance
+Cal.com Booking Creation | < 2 segundos | Custom monitoring
+OPTIMIZACIÓN | IMPLEMENTACIÓN
+Code Splitting | dynamic() de Next.js para DateTimeSelector y PaymentForm. Son los componentes más pesados y solo se necesitan en sus pasos.
+Prefetch de slots | Al seleccionar una fecha, pre-cargar los slots del día siguiente en background (queryClient.prefetchQuery).
+Imágenes de sedes | next/image con sizes='(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'. WebP automático.
+Skeleton loaders | Cada paso tiene su propio skeleton que coincide con el layout exacto del contenido. Evita layout shifts.
+Fonts | next/font con display: swap. Preload de la fuente principal. Subconjunto de caracteres para reducir tamaño.
+ASPECTO | IMPLEMENTACIÓN
+Contraste | El color primario del restaurante debe tener ratio 4.5:1 sobre blanco. Verificar en build time con postcss-color-contrast.
+Navegación por teclado | El flujo completo debe completarse con solo teclado: Tab para navegar, Enter para seleccionar, Escape para cerrar modales.
+Focus management | Al cambiar de paso, hacer focus en el heading del nuevo paso (ref + focus()). Anunciar con aria-live='polite'.
+Time slots | Los time slots deshabilitados tienen aria-disabled='true' y aria-label='[hora] no disponible'.
+QR Code | aria-label='Código QR de tu reserva. Código de confirmación: [código]' para lectores de pantalla.
+TIPO | HERRAMIENTA | COBERTURA MÍNIMA
+Unit tests | Vitest + Testing Library | 80% de componentes UI
+Integration tests | Vitest + MSW (mock server) | Flujo completo por paso
+E2E tests | Playwright | 3 flujos críticos (ver abajo)
+Accesibilidad | axe-core + playwright-axe | Cada paso del flujo
+Performance | Lighthouse CI | En cada PR a main
+Visual regression | Chromatic (Storybook) | Componentes UI críticos
+ℹ️  LOS 3 FLUJOS E2E CRÍTICOS (con MSW para mock de Cal.com y pasarelas)
+Flujo 1 — Reserva sin pago (restaurante sin depósito):
+  Paso 0 (skip) → 1 → 2 → 3 → 4 (confirmar sin pago) → 5 (QR)
+  Verificar: QR visible, email enviado, reserva en Cal.com.
+Flujo 2 — Reserva con pago (Wompi test mode):
+  Paso 0 → 1 → 2 → 3 → 4 (tarjeta de prueba) → 5
+  Verificar: pago procesado, reserva creada, confirmación enviada.
+Flujo 3 — Disponibilidad agotada:
+  Paso 2: seleccionar día lleno.
+  Verificar: sugerencias automáticas aparecen, el usuario puede seleccionar alternativa.
+ASPECTO | IMPLEMENTACIÓN
+Metadata dinámica | generateMetadata() en page.tsx: title='Reserva en {restaurant.name}', description con horarios y ubicación.
+Schema.org JSON-LD | Tipo Restaurant con acceptsReservations: true, hasMap: URL Google Maps, openingHours del restaurante.
+Open Graph | og:image con la foto banner del restaurante. og:title y og:description dinámicos por restaurante.
+Canonical URL | Usar el dominio personalizado si existe (Módulo 1). Si no: tuapp.com/[slug].
+# ─── (Todas las variables del Módulo 1 siguen siendo necesarias) ────────
+
+# ─── AUTH SOCIAL DEL CLIENTE (Clerk — ya configurado en Módulo 1) ───────
+# NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ya está definida en Módulo 1
+# CLERK_SECRET_KEY ya está definida en Módulo 1
+
+# ─── CAL.COM (verificar que estén de Módulo 1) ──────────────────────────
+CALCOM_API_URL=https://cal.tudominio.com/api/v2
+CALCOM_API_KEY=...
+CALCOM_WEBHOOK_SECRET=...   # Para verificar firma HMAC de webhooks de Cal.com
+
+# ─── PASARELAS DE PAGO (público — para el cliente) ──────────────────────
+NEXT_PUBLIC_WOMPI_PUBLIC_KEY=pub_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_...
+
+# ─── UPSTASH REDIS (ya en Módulo 1 — reutilizar la misma instancia) ─────
+# UPSTASH_REDIS_REST_URL ya está definida
+# UPSTASH_REDIS_REST_TOKEN ya está definida
+# NO crear una instancia paralela de Redis
+
+# ─── APP URL (para QR codes y calendar links) ───────────────────────────
+NEXT_PUBLIC_APP_URL=https://tuapp.com
+
+# ─── WHATSAPP (ya en Módulo 1 — para notificaciones de confirmación) ────
+# META_WHATSAPP_TOKEN ya está definida
+# META_PHONE_NUMBER_ID ya está definida
+TEMA | PROPUESTA ORIGINAL | DECISIÓN DEFINITIVA
+Auth cliente | NextAuth.js | ✅ Clerk (consistencia con Módulo 1). Un solo proveedor.
+Cache de estado | No especificado | ✅ sessionStorage (datos sensibles de reserva).
+Disponibilidad RT | WebSocket/SSE | ✅ React Query polling 30s (compatible con Vercel serverless).
+Race conditions | No contemplado | ✅ Redis optimistic lock con TTL 5 min (NX flag).
+Notificaciones | Inline en el API handler | ✅ BullMQ async queue (compartida con Módulo 1).
+Flujo de pago | No definido | ✅ Saga pattern con compensating transactions.
+Feedback del cliente | En pantalla de éxito | ✅ Email 24h después (mejor tasa de respuesta).
+Apple/Google Wallet | Incluido en MVP | ✅ Fase 2 (alta complejidad, bajo impacto inicial).
+Consentimiento datos | Solo checkbox de privacidad | ✅ Registrar en tabla ConsentRecord (Ley 1581 Colombia).
+Sugerencias disponib. | No contemplado | ✅ Algoritmo de búsqueda ±7 días automático.
+Redis client | No especificado | ✅ @upstash/redis (misma instancia del Módulo 1).
+Documento Técnico Definitivo — Módulo 2 de Antigravity  •  Versión 2.0  •  Junio 2026
+Correcciones integradas. Listo para Claude Code y equipo de desarrollo. Continúa con Módulo 3.
+
+
+================================================================================
+FILE: correcionnueva_Modulo3_Definitivo.docx
+================================================================================
+
+📋 Resumen Ejecutivo
+El Módulo 3 es el panel de administración interno del restaurante: el cerebro operativo desde donde el equipo gestiona reservas, clientes, métricas y configuraciones en tiempo real. Este documento integra todas las correcciones técnicas, eliminando errores críticos de arquitectura del documento original.
+
+1. Errores Críticos Corregidos — Leer Antes de Codear
+1.1 Socket.io: Reemplazado por Pusher
+
+
+1.2 Auth del Dashboard: Clerk Organizations (Obligatorio)
+
+1.3 Cal.com: Fuente de Verdad Absoluta
+
+
+1.4 Permisos: Verificar en Servidor, No Solo en Cliente
+
+
+2. Sistema de Roles y Permisos
+2.1 Matriz de Permisos Completa
+
+2.2 Campo source: Valores Completos para Reservation
+
+3. Gestión de Reservas
+3.1 Drag & Drop en el Calendario — Con Validación de Disponibilidad
+
+
+3.2 Check-in: Endpoint Corregido con Asignación de Mesa
+
+3.3 No-Show: Flujo de Reembolso Parcial
+
+4. Implementación Real-Time con Pusher
+4.1 Reconexión Automática y Autenticación
+
+4.2 Endpoint de Autenticación Pusher
+
+4.3 Eventos Pusher del Dashboard
+
+5. Módulo de Analytics — Correcciones
+5.1 Renombrar customerLTV a depositRevenue
+
+5.2 Heatmap de Ocupación: Timezone Awareness
+
+5.3 Bug: División por Cero en generateInsights()
+
+6. CRM de Clientes
+6.1 Criterios de Segmentación Automática
+El documento original mencionaba 'segmentación automática' pero NUNCA definía los criterios. Esto dejaba la implementación al criterio del desarrollador.
+
+
+6.2 Cumplimiento Legal: Ley 1581 de 2012 (Habeas Data Colombia)
+
+6.3 CommunicationLog: Fuente Única de Verdad
+
+7. Panel de Mensajes y Agentes IA
+7.1 Estados de Conversación Bot ↔ Humano
+
+
+7.2 Control de Acceso al Panel de Mensajes
+
+
+7.3 Definición de 'Tasa de Resolución' del Bot
+El campo resolutionRate en BotStats debe tener una definición estricta y consistente entre restaurantes:
+
+
+8. Variables de Entorno Adicionales — Módulo 3
+
+9. Tabla Resumen de Cambios vs. Propuesta Original
+
+10. Checklist de Lanzamiento — Módulo 3
+10.1 Arquitectura y Seguridad
+Clerk Organizations configurado: dueño = Admin, staff = Members con metadata de rol.
+Verificación de permisos en CADA API Route del dashboard (no solo en cliente).
+Pusher configurado y Socket.io eliminado del proyecto.
+Canales de Pusher son PRIVADOS y requieren autenticación vía /api/pusher/auth con Clerk.
+Todas las operaciones de reserva pasan por Cal.com API (no escritura directa a BD).
+Webhook de Cal.com es la única fuente que escribe en la tabla Reservation.
+@upstash/redis usado en todo el proyecto (NO ioredis).
+
+10.2 Funcionalidad
+Drag & drop en calendario valida disponibilidad antes de confirmar el movimiento.
+Check-in incluye asignación de mesa y actualiza el floor plan en tiempo real vía Pusher.
+No-show con depósito dispara reembolso parcial automático si la política lo requiere.
+Segmentación VIP/Regular/Nuevo/Inactivo/En Riesgo con criterios documentados en código.
+Cron job nocturno recalcula segmentos y marca clientes inactivos.
+Estado de conversación bot ↔ humano tiene 4 estados con transición controlada.
+Redacción automática de datos de tarjeta en mensajes al guardar en BD.
+Analytics con timezone del restaurante (date-fns-tz), no UTC.
+generateInsights() maneja división por cero y arrays vacíos.
+Campo source en Reservation acepta: walkin, phone, manual.
+Reconexión automática de Pusher con backoff exponencial implementada.
+
+10.3 Compliance y Datos
+Endpoint DELETE /api/customers/{id} anonimiza datos (Ley 1581 Colombia).
+Endpoint GET /api/customers/{id}/export devuelve todos los datos en JSON/PDF.
+Tabla ConsentRecord registra timestamp, versión de política e IP del Módulo 2.
+Job de retención de datos configurado (default: 3 años, luego anonimizar).
+Historial de comunicaciones unificado en tabla CommunicationLog (no duplicado).
+
+10.4 Performance y Calidad
+Dashboard carga en < 2 segundos (Lighthouse Score > 85 en Desktop).
+Tablas de reservas paginadas server-side (cursor-based, no cargar todo en cliente).
+Queries de analytics con índices en BD: (restaurantId, date), (restaurantId, status).
+Tests E2E para: flujo check-in, flujo no-show, transferencia bot ↔ humano.
+
+ANTIGRAVITY PLATFORM
+MÓDULO 3: DASHBOARD DEL RESTAURANTE
+Panel Operativo Interno — Documento Técnico Definitivo
+Versión 2.0  •  Junio 2026  •  Errores críticos corregidos y arquitectura validada
+⭐  CONEXIÓN CON MÓDULOS ANTERIORES — Fuentes de verdad
+Clerk (Módulo 1) → auth del dashboard. Usar Clerk Organizations. NO mezclar con NextAuth.js.
+Cal.com (Módulo 1) → toda consulta de disponibilidad y reserva pasa por Cal.com API v2.
+BullMQ + Redis (Módulo 2) → reutilizar la misma queue para notificaciones del dashboard.
+Upstash Redis (Módulo 1) → misma instancia. NO crear instancia paralela con ioredis.
+Wompi/Stripe (Módulo 1) → credenciales ya configuradas; el dashboard solo lee el estado.
+sessionStorage (Módulo 2) → el dashboard usa localStorage para preferencias UI (datos no sensibles).
+❌  ERROR CRÍTICO ORIGINAL: Socket.io no funciona en Vercel Serverless
+El documento original propone Socket.io. Vercel + Next.js App Router usa Serverless Functions stateless: NO pueden mantener conexiones WebSocket persistentes.
+Consecuencia: las conexiones WebSocket funcionan en localhost pero FALLAN silenciosamente en producción (Vercel). Este error solo se descubre al desplegar.
+✅  SOLUCIÓN DEFINITIVA: Pusher (o Ably) — 100% compatible con Vercel Serverless
+
+🔴  REGLA DE ORO: Un solo sistema de auth para toda la plataforma
+Cada restaurante = una Organización en Clerk.
+El dueño del restaurante = Organization Admin.
+Hostess, meseros, gerentes = Organization Members con metadata de rol.
+clerkMiddleware() en middleware.ts protege TODAS las rutas del dashboard.
+Roles personalizados guardados en DOS lugares:
+  → Clerk: user.organizationMemberships[0].role (para auth y sesión).
+  → PostgreSQL: tabla StaffMember.role (para lógica de negocio y auditoría).
+NUNCA verificar permisos solo en el cliente → siempre validar en el API Route también.
+❌  ANTI-PATRÓN CRÍTICO: Crear/editar reservas directamente en la BD sin pasar por Cal.com
+Si el dashboard escribe directamente a la BD de Antigravity sin notificar a Cal.com, el slot queda bloqueado o disponible incorrectamente. Esto genera doble-booking.
+OPERACIÓN | FLUJO CORRECTO | FLUJO INCORRECTO (prohibido)
+Crear reserva manual | POST /api/v2/bookings en Cal.com → webhook BOOKING_CREATED → BD Antigravity | POST /api/reservations → BD directa (Cal.com no se entera del slot ocupado)
+Editar reserva | PATCH /api/v2/bookings/{uid} en Cal.com → webhook → BD Antigravity | PUT /api/reservations/{id} → BD directa (Cal.com muestra disponibilidad incorrecta)
+Cancelar reserva | DELETE /api/v2/bookings/{uid} en Cal.com → webhook → BD Antigravity | DELETE /api/reservations/{id} → BD directa (slot queda bloqueado en Cal.com)
+Check-in | PATCH metadata en Cal.com + actualizar BD Antigravity (atómico) | Solo actualizar BD local (Cal.com no refleja el estado real)
+❌  VULNERABILIDAD DE SEGURIDAD: Verificar permisos solo con usePermissions() en el cliente
+Ocultar elementos en la UI NO protege los endpoints de la API. Un WAITER puede hacer una petición directa a PUT /api/settings/restaurant y modificar la configuración del restaurante.
+✅  PATRÓN CORRECTO: Verificar permisos en cada API Route del servidor
+
+PERMISO | OWNER | MANAGER | HOSTESS | WAITER | VIEWER
+manageSettings (config restaurante) | ✅ | ✅ | ❌ | ❌ | ❌
+manageStaff (gestionar personal) | ✅ | ✅ | ❌ | ❌ | ❌
+viewReservations | ✅ | ✅ | ✅ | ✅ | ✅
+createReservations | ✅ | ✅ | ✅ | ❌ | ❌
+editReservations | ✅ | ✅ | ✅ | ❌ | ❌
+cancelReservations | ✅ | ✅ | ✅ | ❌ | ❌
+processCheckins (marcar llegadas) | ✅ | ✅ | ✅ | ✅ | ❌
+viewMessages (conversaciones WA) | ✅ | ✅ | ✅ | ❌ | ❌
+respondMessages (tomar control bot) | ✅ | ✅ | ✅ | ❌ | ❌
+viewPayments (ver depósitos) | ✅ | ✅ | ❌ | ❌ | ❌
+issueRefunds (emitir reembolsos) | ✅ | ⚠️ límite | ❌ | ❌ | ❌
+viewAnalytics | ✅ | ✅ | ❌ | ❌ | ✅
+viewAuditLogs | ✅ | ❌ | ❌ | ❌ | ❌
+manageIntegrations (POS, Google) | ✅ | ✅ | ❌ | ❌ | ❌
+ℹ️  Corrección: Agregar walkin, phone y manual como valores válidos
+El documento original solo incluía: web | whatsapp | widget | api. El dashboard muestra 'Walk-in' y 'Teléfono' en los filtros pero esos valores no existían en el schema.
+⚠️  El documento original NO verificaba disponibilidad antes de confirmar el movimiento
+Si el slot destino ya estaba lleno, Cal.com rechazaba el cambio pero la UI ya había actualizado — estado inconsistente.
+✅  FLUJO CORRECTO: Optimistic Update con Rollback automático
+
+ENDPOINT ORIGINAL (incompleto) | ENDPOINT CORREGIDO
+POST /api/reservations/{id}/check-in
+
+Response:
+{ success, checkedInAt } | POST /api/reservations/{id}/check-in
+Body: { tableId?: string }
+
+Response:
+{ success, checkedInAt, assignedTableId, floorPlanUpdated }
+
+Acción:
+1. Marcar check-in en BD
+2. Asignar mesa en floor plan
+3. PATCH metadata en Cal.com
+4. Emitir evento Pusher al dashboard
+⚠️  El endpoint de no-show no cubría todos los escenarios de reembolso
+
+PROBLEMA | IMPLEMENTACIÓN REQUERIDA
+Reconexión automática | Pusher no reconecta automáticamente después de 30s+ de inactividad en móviles. Implementar backoff exponencial: 1s, 2s, 4s, 8s. Luego mostrar banner 'Conexión perdida. Reconectando...'
+Autenticación del canal | Usar canales PRIVADOS: private-restaurant-{restaurantId}. Requieren autenticación vía POST /api/pusher/auth con verificación Clerk. NUNCA usar canales públicos para datos del restaurante.
+Múltiples pestañas | Si el mismo usuario tiene 2 pestañas del dashboard, recibirá cada evento duplicado. Usar BroadcastChannel API para deduplicar eventos por tabId.
+// app/api/pusher/auth/route.ts
+import { auth } from '@clerk/nextjs/server';
+import Pusher from 'pusher';
+
+const pusher = new Pusher({
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: process.env.PUSHER_CLUSTER!,
+});
+
+export async function POST(request: Request) {
+  const { userId, orgId } = auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await request.formData();
+  const socketId = body.get('socket_id') as string;
+  const channel = body.get('channel_name') as string;
+
+  // Verificar que el canal solicitado corresponde al restaurante del usuario
+  const expectedChannel = `private-restaurant-${orgId}`;
+  if (channel !== expectedChannel) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const authResponse = pusher.authorizeChannel(socketId, channel);
+  return NextResponse.json(authResponse);
+}
+EVENTO | DESCRIPCIÓN Y ORIGEN
+new-booking | Nueva reserva creada (web, WhatsApp, widget, API). Origen: webhook Cal.com BOOKING_CREATED.
+booking-cancelled | Reserva cancelada. Origen: webhook Cal.com BOOKING_CANCELLED.
+booking-checkin | Check-in registrado. Origen: POST /api/reservations/{id}/check-in.
+booking-noshow | No-show registrado. Origen: POST /api/reservations/{id}/no-show.
+new-conversation | Nueva conversación de WhatsApp. Origen: webhook de Chatwoot/Meta.
+conversation-update | Mensaje nuevo en conversación activa. Origen: webhook de Chatwoot.
+call-transcript | Transcripción en vivo de llamada de voz. Origen: webhook de Vapi.ai.
+floor-plan-update | Cambio en asignación de mesas. Origen: cualquier operación de check-in.
+⚠️  LTV calculado solo sobre depósitos es una métrica engañosa para el restaurante
+Antigravity en MVP no gestiona el ticket real de la mesa (eso lo hace el POS). El LTV calculado sería únicamente sobre depósitos pagados.
+Solución: renombrar y agregar disclaimer:
+❌  Bug: El heatmap mostraba datos desfasados 5 horas (UTC vs America/Bogota)
+El servidor generaba fechas en UTC. El restaurante está en America/Bogota (UTC-5). Una reserva a las 8pm del viernes aparecía como 1am del sábado en el heatmap.
+❌  Bug: NaN% cuando el restaurante no tiene reservas aún
+
+SEGMENTO | CRITERIO EXACTO | RECALCULAR CUANDO | ACCIÓN
+Nuevo | total_reservas_completadas === 1 | Al completar primera reserva | Badge azul 'Nuevo'
+Regular | 2-9 reservas completadas (no canceladas ni no-shows) | Al completar cada reserva | Badge verde 'Regular'
+VIP | 10+ reservas O depósitos totales > $500.000 COP | Al completar reserva o superar umbral de gasto | Badge dorado 'VIP'
+Inactivo | Sin reservas en los últimos 90 días (configurable por restaurante) | Job nocturno (cron) que recalcula segmentos diariamente | Badge gris 'Inactivo'
+En Riesgo | 2+ no-shows en el último año | Al registrar un no-show | Badge rojo 'En Riesgo'
+🔴  REQUERIMIENTOS LEGALES OBLIGATORIOS — Ley 1581 de 2012
+1. DERECHO DE SUPRESIÓN:
+2. DERECHO DE ACCESO: GET /api/customers/{id}/export
+   → JSON o PDF con TODOS los datos: perfil + reservas + mensajes + consentimientos.
+3. RETENCIÓN DE DATOS:
+   → Política: 3 años. Job mensual que anonimiza clientes inactivos por más del período.
+4. REGISTRO DE CONSENTIMIENTO:
+   → El checkbox del Módulo 2 registra en tabla ConsentRecord: { clientEmail, restaurantId, timestamp, policyVersion, ipAddress }.
+ℹ️  Una sola tabla para TODO el historial de comunicaciones del cliente
+Problema original: el historial se construía leyendo tanto la tabla Conversation (WhatsApp) como los logs de BullMQ — generando duplicados.
+Solución: tabla CommunicationLog donde TODOS los sistemas escriben eventos:
+⚠️  El documento original solo tenía 2 estados (bot/humano). Faltaba el estado de transición.
+Sin estado intermedio, si el humano hace click en 'Tomar Control' mientras el bot procesa un mensaje, pueden enviarse dos respuestas simultáneas al cliente.
+ESTADO | DESCRIPCIÓN | REGLA | TIMEOUT
+bot (activo) | El bot responde automáticamente. | Los mensajes del humano en el dashboard NO se envían al cliente. | —
+transferring | Estado intermedio de transición. | Dura máximo 3 segundos. El bot termina el mensaje en curso y no inicia uno nuevo. | 3 segundos
+human (activo) | Solo el humano puede responder. | El bot está silenciado. Si el humano no responde en X min → vuelve a 'bot'. | Configurable
+resolved (cerrado) | Conversación cerrada. Solo lectura. | No se pueden enviar mensajes. Archivar en CommunicationLog. | —
+ROL | ACCESO AL PANEL DE MENSAJES
+OWNER / MANAGER | Pueden ver TODAS las conversaciones (activas, históricas, resueltas).
+HOSTESS | Solo conversaciones activas y de hoy. No acceso a histórico.
+WAITER / VIEWER | Sin acceso al panel de mensajes.
+ℹ️  Redacción automática de PII en mensajes almacenados
+
+ℹ️  Definición oficial: Una conversación se cuenta como 'resuelta por el bot' si:
+(a) Se creó una reserva CONFIRMADA en Cal.com durante la conversación, O
+(b) El usuario envió un mensaje de despedida ('gracias', 'ok', 'listo', 'bye') SIN que se haya activado 'Tomar Control' en ningún momento.
+Una conversación NO cuenta como resuelta si: fue transferida a humano en algún momento, la reserva quedó pendiente sin confirmar, o el cliente abandonó la conversación sin respuesta.
+# ─── (Todas las variables de Módulos 1 y 2 siguen siendo necesarias) ────
+
+# ─── PUSHER (reemplaza Socket.io) ────────────────────────────────────────
+PUSHER_APP_ID=...
+PUSHER_KEY=...
+PUSHER_SECRET=...
+PUSHER_CLUSTER=us2
+NEXT_PUBLIC_PUSHER_KEY=...
+NEXT_PUBLIC_PUSHER_CLUSTER=us2
+
+# ─── SEGMENTACIÓN CRM (configurable, con defaults) ───────────────────────
+DEFAULT_VIP_THRESHOLD_RESERVATIONS=10
+DEFAULT_VIP_THRESHOLD_SPEND=500000   # COP
+DEFAULT_INACTIVE_DAYS=90
+
+# ─── COMPLIANCE (Ley 1581 Colombia) ─────────────────────────────────────
+DATA_RETENTION_YEARS=3
+
+# ─── ANALYTICS CACHE ─────────────────────────────────────────────────────
+ANALYTICS_CACHE_TTL=3600   # segundos (1 hora)
+
+# NOTA: NO crear nueva instancia de Redis.
+# Reutilizar UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN del Módulo 1.
+TEMA | PROPUESTA ORIGINAL | DECISIÓN DEFINITIVA | PRIORIDAD
+Real-time en Vercel | Socket.io con servidor propio | ✅ Pusher (canales privados serverless-compatible) | 🔴 Crítica
+Auth del dashboard | Sin especificar (riesgo NextAuth) | ✅ Clerk Organizations (mismo que Módulo 1) | 🔴 Crítica
+Operaciones Cal.com | CRUD directo a BD Antigravity | ✅ Cal.com API primero, BD vía webhook | 🔴 Crítica
+Permisos en API | Solo verificación en cliente (UI) | ✅ Verificación en CADA API Route del servidor | 🔴 Crítica
+Redis client | No especificado (riesgo ioredis) | ✅ @upstash/redis (misma instancia Módulo 1) | 🔴 Crítica
+Notificaciones | Sistema nuevo para dashboard | ✅ Reutilizar BullMQ queue del Módulo 2 | 🟡 Alta
+Segmentación CRM | Criterios no definidos | ✅ Criterios explícitos + cron job nocturno | 🟡 Alta
+Habeas Data | No contemplado | ✅ Endpoints supresión y exportación (Ley 1581) | 🟡 Alta
+Estado bot ↔ humano | Solo 2 estados (bot/humano) | ✅ 4 estados con estado de transición controlado | 🟠 Media
+Heatmap timezone | UTC sin conversión | ✅ date-fns-tz con branch.timezone | 🟠 Media
+División por cero | Bug en generateInsights() | ✅ Guard: verificar totalReservations > 0 | 🟠 Media
+LTV analytics | customerLTV sobre datos incompletos | ✅ depositRevenue con disclaimer hasta integrar POS | 🟢 Baja
+Campo source | web|whatsapp|widget|api | ✅ Agrega: walkin|phone|manual | 🟢 Baja
+Documento Técnico Definitivo — Módulo 3 de Antigravity  •  Versión 2.0  •  Junio 2026
+Correcciones integradas. Listo para Claude Code y equipo de desarrollo. Continúa con Módulo 4.
+
+
+================================================================================
+FILE: correcionnueva_Modulo4_Definitivo.docx
+================================================================================
+
+📋 Resumen Ejecutivo
+El Módulo 4 es el sistema de Agentes de IA Unificados: la capa conversacional que atiende reservas por WhatsApp, llamadas telefónicas (voz) y chat web, convergiendo en un único dashboard y creando todas las reservas en Cal.com. Este documento integra todas las correcciones técnicas identificadas en la revisión.
+
+1. Errores Críticos Corregidos — Leer Antes de Codear
+1.1 Socket.io: Mismo Error del Módulo 3 — Reemplazado por Pusher
+
+1.2 Account ID Hardcodeado en Chatwoot — Error de Multi-Tenant
+
+1.3 ioredis Reemplazado por @upstash/redis
+
+1.4 Verificación de Webhooks: Chatwoot y Vapi
+
+1.5 eventTypeId del Agente: Inyectar desde BD
+
+2. Arquitectura Completa del Sistema de Agentes
+2.1 Componentes y Flujo
+
+2.2 Flujo WhatsApp Completo y Corregido
+Cliente envía mensaje a WhatsApp Business del restaurante.
+Meta → Chatwoot → webhook POST /api/webhooks/chatwoot.
+Verificar firma X-Chatwoot-Signature-256 (OBLIGATORIO).
+Identificar restaurante por chatwootAccountId dinámico (NO hardcodeado).
+Verificar si la conversación está en estado 'human-attending'. Si sí: no procesar con IA.
+Recuperar historial de conversación de Upstash Redis (TTL 24h).
+Construir system prompt DINÁMICO desde BD (cacheado 10 min en Redis).
+GPT-4o procesa con max_tokens: 500 y máximo 3 iteraciones de tool_calls.
+Agente usa checkAvailabilityWithFallback() — busca ±7 días si la fecha está llena.
+createBooking() → Cal.com API v2 → webhook BOOKING_CREATED → BD Antigravity + Pusher.
+Registrar en CommunicationLog y guardar historial en Redis.
+Chatwoot envía la respuesta al cliente por WhatsApp.
+
+3. Bugs de Código Corregidos
+3.1 saveConversationHistory: Contenido null con Tool Calls
+
+3.2 Filtro de Slots: Condición Invertida
+
+3.3 Email Ficticio para Clientes de Voz
+
+3.4 Etiquetas de Chatwoot: Intercambio Correcto Bot ↔ Humano
+
+3.5 Contexto del Cliente: Orden Correcto de Mensajes
+
+3.6 Redirect de Twilio a Vapi: URL Corregida
+
+4. Guard Contra Loop Infinito de Tool Calls
+4.1 Implementación del Límite de Iteraciones
+
+5. Integración con Cal.com — Gaps Corregidos
+5.1 Sincronizar Resultado de createBooking() a la BD
+
+5.2 cancelBooking: Verificación de Ownership
+
+5.3 checkAvailability con Fallback Automático
+
+6. Gestión de Costos de API
+6.1 Mapa de Costos por Conversación
+
+6.2 Controles de Costo Obligatorios
+
+7. Integración de Voz con Vapi.ai
+7.1 Voz en Español Latinoamericano
+
+7.2 transferToHuman en Voz: Implementación Real
+
+7.3 Manejo de Llamadas Simultáneas
+
+8. Transcripción en Vivo de Llamadas
+8.1 Handler de Eventos de Transcripción
+El documento original mencionaba 'transcripción en tiempo real' pero no implementaba el handler. Vapi.ai envía eventos transcript durante la llamada.
+
+
+9. Habeas Data en el Primer Mensaje
+9.1 Verificación de Consentimiento
+
+10. Variables de Entorno — Módulo 4
+
+11. Tabla Resumen de Cambios vs. Propuesta Original
+
+12. Checklist de Lanzamiento — Módulo 4
+12.1 Arquitectura y Seguridad
+Socket.io eliminado; reemplazado por Pusher (canales privados autenticados con Clerk).
+ioredis eliminado; reemplazado por @upstash/redis en todo el Módulo 4.
+Webhook de Chatwoot verifica firma HMAC-SHA256 (X-Chatwoot-Signature-256).
+Webhook de Vapi.ai verifica firma HMAC-SHA256 (X-Vapi-Signature).
+Webhook de Twilio verifica firma HMAC (twilio.validateRequest()).
+chatwootAccountId es dinámico desde BD (NO hardcodeado como '1').
+Canal Pusher es private-restaurant-{restaurantId} con auth en /api/pusher/auth.
+Dashboard de conversaciones requiere auth Clerk y filtra por restaurantId.
+cancelBooking verifica ownership antes de proceder (404 si no coincide).
+
+12.2 Integración y Flujos
+eventTypeId inyectado en el contexto del agente desde BD (no hardcodeado).
+System prompt generado dinámicamente con horarios reales (cacheado Redis 10min).
+handleIncomingMessage verifica que la conversación no esté en modo 'human-attending'.
+saveConversationHistory guarda el contenido de la respuesta FINAL (no null).
+Loop de function calling limitado a 3 iteraciones con fallback de mensaje.
+checkAvailabilityWithFallback busca slots alternativos (±7 días) automáticamente.
+createBooking registra resultado en tabla Reservation de PostgreSQL.
+createBooking emite evento Pusher para actualizar Dashboard M3 en tiempo real.
+createBooking registra en CommunicationLog con source correcto.
+transferToHuman en voz implementado con Vapi Transfer API y número real.
+Mensajes de media (imágenes, audio) manejados sin llamar a OpenAI innecesariamente.
+Etiquetas de Chatwoot intercambian correctamente en cada transferencia bot↔humano.
+
+12.3 Costos y Calidad de Servicio
+Timeout máximo de llamada en Vapi: maxDuration: 300 segundos (5 minutos).
+Rate limiting por restaurante en llamadas a OpenAI (Upstash Ratelimit, según plan).
+max_tokens: 500 configurado en cada request a OpenAI.
+Alertas de presupuesto configuradas en OpenAI API.
+Transcripción en vivo: handler webhook transcript → Pusher → ConversationDetail UI.
+CommunicationLog registra todos los mensajes de WhatsApp, voz y chat web.
+ConsentRecord registrado en el primer mensaje de cada cliente nuevo.
+Voz en español latinoamericano configurada (Valentina u otra nativa, NO Rachel).
+
+12.4 Testing Antes de Producción
+Flujo completo: WhatsApp → GPT-4o → Cal.com → confirmación (sin pago).
+Flujo completo: Llamada de voz → Vapi → GPT-4o → Cal.com → confirmación SMS.
+Flujo: fecha sin disponibilidad → agente ofrece alternativas → cliente acepta.
+Flujo: transferencia bot → humano → humano responde → bot retoma (con timeout).
+Prueba de carga: 10 conversaciones simultáneas sin mezclar contextos de Redis.
+Prueba de seguridad: webhook sin firma → debe retornar 401.
+Prueba de costo: simular loop de tool_calls → se corta en iteración 3.
+Reservas del agente aparecen en el Dashboard del Módulo 3 en tiempo real.
+
+ANTIGRAVITY PLATFORM
+MÓDULO 4: AGENTES DE IA UNIFICADOS
+WhatsApp · Voz · Chat Web — Documento Técnico Definitivo
+Versión 2.0  •  Junio 2026  •  Bugs críticos corregidos · Arquitectura validada
+⭐  CONEXIÓN CON MÓDULOS ANTERIORES — Reglas no negociables
+Clerk (M1) → auth del dashboard del agente. Los roles del M3 controlan quién puede 'Tomar Control'.
+Cal.com (M1) → TODA creación de reserva pasa por Cal.com API v2. NUNCA escritura directa a BD.
+BullMQ + Upstash Redis (M2) → reutilizar la queue existente. NO usar ioredis.
+Pusher (M3) → dashboard de conversaciones en tiempo real. NO Socket.io.
+CommunicationLog (M3) → TODOS los mensajes del agente se registran en esta tabla.
+ConsentRecord (M3) → el primer mensaje del cliente activa el check de consentimiento Habeas Data.
+❌  El componente ConversationsDashboard.tsx usaba Socket.io (incompatible con Vercel)
+En producción (Vercel) el dashboard NO recibirá actualizaciones en tiempo real. Las conversaciones llegan al backend pero la UI nunca se actualiza.
+❌  TODOS los endpoints usaban /api/v1/accounts/1/ — rompía modelo multi-restaurante
+Si el restaurante B envía un mensaje, el sistema lo procesaba en la cuenta del restaurante A. El accountId DEBE ser dinámico desde la BD.
+🔴  El Módulo 4 usaba ioredis (new Redis()) — cliente incompatible con Vercel Edge Runtime
+Tener dos clientes de Redis distintos genera: conexiones duplicadas, inconsistencias de TTL, errores en edge functions.
+❌  Los webhooks de Chatwoot y Vapi.ai no verificaban autenticidad — cualquier atacante podía activar el agente IA
+Sin verificación HMAC, un atacante puede: crear reservas fraudulentas, generar costos de OpenAI desbordados, y enviar spam al dashboard.
+❌  El agente llamaba a Cal.com sin saber qué eventTypeId usar — error 400 de Cal.com
+La función checkAvailability requiere un eventTypeId, pero ni el system prompt ni las tools lo incluían. GPT-4o no podía consultar disponibilidad correctamente.
+COMPONENTE | DETALLE Y VERSIÓN DEFINITIVA
+Modelo IA | GPT-4o (OpenAI). max_tokens: 500 por request. Máximo 3 iteraciones de tool_calls por conversación.
+Orquestador | LangChain.js. Maneja ciclo ReAct (Razonar → Actuar → Observar).
+Mensajería WhatsApp | Chatwoot (Cloud para MVP, Self-hosted en Fase 2) + WhatsApp Business API (Meta).
+Mensajería Voz | Vapi.ai (orquestación) + Twilio (telefonía) + ElevenLabs (voz en español latinoamericano).
+Chat Web | Widget embebible del Módulo 1 + Chatwoot Live Chat SDK.
+Webhook WhatsApp | POST /api/webhooks/chatwoot — verificar X-Chatwoot-Signature-256.
+Webhook Voz | POST /api/webhooks/vapi — verificar X-Vapi-Signature.
+Webhook Twilio | POST /api/twilio/voice — verificar con twilio.validateRequest().
+Estado conversación | Upstash Redis. Historial por conversationId (WhatsApp) o callId (Voz). TTL: 24h.
+Rate limiting | Upstash Ratelimit. Límite por restaurante según plan. Max tool_calls: 3 por turno.
+Real-time dashboard | Pusher canales privados (private-restaurant-{restaurantId}).
+❌  Bug: assistantMessage.content es null cuando GPT-4o usa function calling
+
+❌  Bug lógico: slot.attendees < partySize era la condición invertida
+
+❌  Bug: email @reservations.local viola el schema de Cal.com y genera rebotes
+
+❌  Bug: assignConversationToBot() agregaba etiqueta sin remover la de humano — ambas activas simultáneamente
+
+❌  Bug lógico: el contexto del cliente se inyectaba DESPUÉS del mensaje del usuario
+
+❌  Bug: la URL de redirect a Vapi era construida manualmente y era incorrecta
+
+🔴  Riesgo crítico: un loop de tool_calls puede generar cientos de llamadas a OpenAI en segundos
+
+⚠️  El agente creaba reservas en Cal.com pero NO las guardaba en la tabla Reservation de PostgreSQL
+Consecuencia: las reservas del agente IA no aparecían en el Dashboard del Módulo 3. El restaurante las veía en Cal.com pero no en Antigravity.
+❌  Vulnerabilidad: un cliente podía cancelar reservas de otro restaurante
+
+✅  Patrón recomendado: nunca responder 'sin disponibilidad' sin buscar alternativas
+
+SERVICIO | COSTO APROX. | RIESGO SIN CONTROL | CONTROL IMPLEMENTADO
+OpenAI GPT-4o | $0.01-0.05 / conversación | Loop infinito → $100s en minutos | max_tokens:500 + max_tool_calls:3
+ElevenLabs TTS | $0.18 / 1.000 chars | Llamadas largas → costo lineal | maxDuration: 300s en Vapi
+Twilio WhatsApp | $0.005 / mensaje | Spam/loops → acumulación silenciosa | Rate limit por restaurante (Upstash)
+Twilio Voice | $0.013/min inbound+outbound | Llamadas sin timeout → horas de costo | maxDuration: 300s obligatorio
+Vapi.ai | $0.05-0.20 / minuto | Sin timeout = llamadas infinitas | maxDuration: 300s en configuración
+🔴  IMPLEMENTAR ANTES de lanzar a producción
+
+⚠️  La voz 'Rachel' de ElevenLabs tiene acento anglosajón en español — incongruente para restaurantes colombianos
+Alternativas recomendadas para español latinoamericano:
+ElevenLabs 'Valentina': voz femenina entrenada en español latinoamericano.
+PlayHT 'es-CO-SalomeNeural': voz colombiana de Microsoft Azure (disponible vía Vapi).
+Hacer el voice_id configurable por restaurante (campo voice_id en tabla WhatsAppAgent).
+Permitir al restaurante elegir la voz durante el onboarding (Módulo 1, configuración del agente).
+LATENCIA: ElevenLabs añade 300-800ms. Si supera 2 segundos percibidos, evaluar Azure TTS o Google TTS.
+❌  La función transferToHuman solo retornaba { success: true } sin implementación real
+
+ℹ️  Clave de Redis correcta para llamadas de voz (no mezclar contextos)
+
+// app/api/webhooks/vapi/route.ts
+if (event.type === 'transcript') {
+  const { callId, role, transcript } = event;
+  const restaurantId = await redis.get(`call:${callId}:restaurant`);
+
+  // Emitir al dashboard en tiempo real:
+  await pusher.trigger(`private-restaurant-${restaurantId}`, 'call-transcript', {
+    callId, role, text: transcript, timestamp: new Date()
+  });
+
+  // Acumular en Redis para historial completo:
+  const current = await redis.get(`call:${callId}:transcript`) ?? '';
+  await redis.setex(
+    `call:${callId}:transcript`,
+    3600,
+    current + `\n[${role}] ${transcript}`
+  );
+}
+
+if (event.type === 'call-ended') {
+  const transcript = await redis.get(`call:${callId}:transcript`);
+  // Guardar transcript completo en CommunicationLog
+  await db.communicationLog.create({ data: {
+    restaurantId, type: 'call', direction: 'inbound',
+    content: transcript, source: 'bot'
+  }});
+  // Limpiar claves de Redis
+  await redis.del(`call:${callId}:history`);
+  await redis.del(`call:${callId}:restaurant`);
+  await redis.del(`call:${callId}:transcript`);
+}
+ℹ️  El primer mensaje de un cliente nuevo debe registrar consentimiento (Ley 1581 de Colombia)
+
+# ─── (Todas las variables de Módulos 1, 2 y 3 siguen siendo necesarias) ──
+
+# ─── CHATWOOT ──────────────────────────────────────────────────────────
+CHATWOOT_API_URL=https://app.chatwoot.com     # o URL self-hosted
+CHATWOOT_TOKEN=your_api_access_token
+CHATWOOT_WEBHOOK_SECRET=...                   # Para verificar X-Chatwoot-Signature-256
+CHATWOOT_DEPLOYMENT=cloud                     # cloud | self-hosted
+
+# ─── TWILIO ────────────────────────────────────────────────────────────
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_NUMBER=whatsapp:+1415...
+TWILIO_VOICE_NUMBER=+1415...
+
+# ─── VAPI.AI ────────────────────────────────────────────────────────────
+VAPI_API_KEY=...
+VAPI_ASSISTANT_ID=...
+VAPI_WEBHOOK_SECRET=...                       # Para verificar X-Vapi-Signature
+VAPI_TWILIO_WEBHOOK_URL=https://api.vapi.ai/twilio/inbound/...  # Del dashboard Vapi
+
+# ─── ELEVENLABS (voz en español latinoamericano) ────────────────────────
+ELEVENLABS_VOICE_ID=...                       # Valentina u otra voz nativa configurable
+
+# ─── LÍMITES DE COSTO ───────────────────────────────────────────────────
+AI_CONVERSATIONS_PER_DAY_FREE=50
+AI_CONVERSATIONS_PER_DAY_PRO=500
+CALL_MAX_DURATION_SECONDS=300                 # 5 minutos máximo por llamada
+
+# ─── COMPLIANCE ─────────────────────────────────────────────────────────
+PRIVACY_POLICY_VERSION=1.0                    # Para registrar en ConsentRecord
+
+# NOTA: NO crear nueva instancia de Redis.
+# Reutilizar UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN del Módulo 1.
+# NO usar ioredis en ningún archivo del Módulo 4.
+TEMA | PROPUESTA ORIGINAL | DECISIÓN DEFINITIVA | PRIORIDAD
+Real-time Vercel | Socket.io (incompatible) | ✅ Pusher privado (M3) | 🔴 Crítica
+Auth dashboard | Sin auth en conversaciones | ✅ Clerk + canal Pusher privado | 🔴 Crítica
+Account Chatwoot | Hardcodeado como '1' | ✅ Dinámico desde BD por restaurante | 🔴 Crítica
+Firma webhooks | Sin verificación | ✅ HMAC-SHA256: Chatwoot+Vapi+Twilio | 🔴 Crítica
+Redis client | ioredis (incompatible Edge) | ✅ @upstash/redis (M1, Edge-compatible) | 🔴 Crítica
+eventTypeId | Sin valor definido | ✅ Inyectado en system prompt desde BD | 🔴 Crítica
+Sync Cal.com→BD | Sin sincronización | ✅ Escribir tabla Reservation + Pusher | 🟡 Alta
+Loop GPT-4o | Sin límite iteraciones | ✅ max_tool_calls: 3 + fallback | 🟡 Alta
+Email ficticio voz | @reservations.local | ✅ Dominio propio o campo opcional | 🟡 Alta
+transferToHuman voz | Solo { success: true } | ✅ Vapi Transfer API + Pusher | 🟡 Alta
+Costos API | Sin control ni límites | ✅ Rate limit+timeout+alertas presupuesto | 🟡 Alta
+Transcripción vivo | Mencionado, sin implementar | ✅ Handler webhook + Pusher streaming | 🟠 Media
+System prompt | Texto fijo en código | ✅ Dinámico desde BD (Redis TTL 10min) | 🟠 Media
+Fallback disponib. | Sin alternativas | ✅ checkAvailabilityWithFallback ±7 días | 🟠 Media
+Habeas Data WA | Sin verificación | ✅ ConsentRecord en primer mensaje | 🟠 Media
+Voz español | Rachel (inglés nativa) | ✅ Valentina o voz configurable | 🟢 Baja
+Documento Técnico Definitivo — Módulo 4 de Antigravity  •  Versión 2.0  •  Junio 2026
+Correcciones integradas. Listo para Claude Code y equipo de desarrollo. Continúa con Módulo 5.
+

@@ -1,0 +1,6534 @@
+
+================================================================================
+FILE: Agendamiento modulo 1.pdf
+================================================================================
+
+--- Page 3 ---
+PROMPT TÉCNICO PARA ANTIGRAVITY - MÓDULO 1:
+ONBOARDING SELF-SERVICE
+markdown
+# CONTEXTO DEL PROYECTO
+Estás construyendo una plataforma SaaS de reservas para
+restaurantes (similar a OpenTable/Precompra pero mejorada).
+--- Page 4 ---
+El sistema usará Cal.com como backend de reservas
+(self-hosted).
+Esta es la PRIMERA PARTE: El sistema de
+onboarding/configuración self-service para restaurantes.
+STACK TECNOLÓGICO:
+- Frontend: Next.js 14+ (App Router), TypeScript, TailwindCSS
+- UI Components: shadcn/ui, Radix UI
+- Drag & Drop: dnd-kit o react-beautiful-dnd
+- Image Upload: UploadThing o Cloudinary
+- Color Picker: react-colorful o @uiw/react-color
+- QR Generation: qrcode.react o node-qrcode
+- State Management: Zustand o React Context
+- Forms: React Hook Form + Zod validation
+- Backend: Next.js API Routes + Prisma ORM
+- Database: PostgreSQL
+- Auth: NextAuth.js o Clerk
+---
+## CARACTERÍSTICA 1: SETUP WIZARD DE 5 PASOS
+### REQUISITOS FUNCIONALES:
+Crea un wizard multi-paso progresivo que guíe al restaurante
+en su configuración inicial.
+**ESTRUCTURA DEL WIZARD:**
+Paso 1: Información Básica
+- Campo: Nombre del restaurante (texto, requerido, max 100
+chars)
+- Campo: NIT/Documento de identidad (texto, requerido)
+--- Page 5 ---
+- Campo: Tipo de establecimiento (select: Restaurante, Bar,
+Cafetería, Food Truck, Otro)
+- Campo: Descripción corta (textarea, max 250 chars)
+- Campo: Dirección completa (texto con autocompletado de
+Google Places API)
+- Campo: Ciudad (select dinámico basado en Google Places)
+- Campo: Teléfono principal (input tipo tel con validación de
+formato)
+- Campo: Email de contacto (input email, validación)
+- Campo: Sitio web (input url, opcional)
+- Campo: Redes sociales (inputs opcionales: Instagram,
+Facebook, TikTok)
+Paso 2: Horarios de Atención
+- Componente: Grid de 7 días (Lunes a Domingo)
+- Por cada día:
+* Checkbox "Abierto este día"
+* Si está abierto:
+- Selector de hora de apertura (time picker HH:mm)
+- Selector de hora de cierre (time picker HH:mm)
+- Botón "Agregar turno" (para restaurantes con almuerzo y
+cena)
+- Múltiples turnos soportados (ej: 12:00-15:00,
+19:00-23:00)
+- Toggle: "Horarios especiales para festivos"
+- Selector de zona horaria (default: America/Bogota)
+Paso 3: Configuración de Capacidad y Mesas
+- Campo: Capacidad total máxima (número, min 1)
+- Campo: Duración promedio de reserva (select: 30min, 45min,
+1h, 1h30m, 2h, 2h30m, 3h)
+- Campo: Tiempo entre reservas (buffer time, select: 0min,
+15min, 30min)
+- Sección: Configuración de mesas
+--- Page 6 ---
+* Botón "Agregar tipo de mesa"
+* Por cada tipo de mesa:
+- Nombre (ej: "Mesa para 2", "Mesa VIP", "Barra")
+- Capacidad mínima (número)
+- Capacidad máxima (número)
+- Cantidad de mesas disponibles (número)
+- Upload de imagen opcional (foto de referencia)
+- Toggle: "Permitir reservas para grupos grandes (+10
+personas)"
+- Si es sí: Campo "Capacidad máxima por reserva" (default 20)
+Paso 4: Configuración de Pagos y Depósitos
+- Toggle: "Requerir depósito para reservar"
+- Si es sí:
+* Radio buttons: Tipo de depósito
+- "Porcentaje del estimado" (input número, min 10, max
+100, default 50)
+- "Monto fijo" (input número con selector de moneda)
+- "Solo garantía de tarjeta" (sin cobro, solo retención)
+* Toggle: "Cobrar automáticamente por no-show"
+* Si es sí: Input "Horas después para cobrar" (default 2)
+* Toggle: "Permitir reembolsos"
+* Si es sí: Input "Horas antes para reembolso completo"
+(default 24)
+- Selector: Pasarela de pagos (Wompi, PayU, Stripe, ePayco)
+- Campos dinámicos según pasarela seleccionada:
+* Wompi: Public Key, Secret Key
+* Stripe: Publishable Key, Secret Key
+* etc.
+- Toggle: "Aceptar efectivo en el local" (default sí)
+Paso 5: Revisión y Publicación
+- Vista de resumen de todos los datos ingresados
+- Checklist de completitud:
+--- Page 7 ---
+* ✓ Información básica completada
+* ✓ Horarios configurados
+* ✓ Al menos 1 tipo de mesa creado
+* ✓ Método de pago configurado (si requiere depósito)
+- Toggle: "Acepto términos y condiciones" (requerido)
+- Toggle: "Acepto política de privacidad" (requerido)
+- Botón principal: "Publicar mi restaurante" (deshabilitado
+hasta que todo esté completo)
+- Botón secundario: "Guardar como borrador"
+### REQUISITOS TÉCNICOS:
+**Base de Datos (Prisma Schema):**
+```prisma
+model Restaurant {
+id String @id @default(uuid())
+userId String
+name String
+nit String?
+type String
+description String?
+address String
+city String
+phone String
+email String
+website String?
+instagram String?
+facebook String?
+tiktok String?
+timezone String @default("America/Bogota")
+avgReservationTime Int @default(90) // minutos
+bufferTime Int @default(0) // minutos
+maxPartySize Int @default(20)
+--- Page 8 ---
+status String @default("draft") // draft,
+active, suspended
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+// Relaciones
+user User @relation(fields: [userId],
+references: [id])
+schedules Schedule[]
+tableTypes TableType[]
+paymentSettings PaymentSettings?
+branding Branding?
+branches Branch[]
+}
+model Schedule {
+id String @id @default(uuid())
+restaurantId String
+dayOfWeek Int // 0=Domingo, 1=Lunes, ..., 6=Sábado
+isOpen Boolean @default(true)
+shifts Json // Array de {open: "12:00", close:
+"15:00"}
+isHoliday Boolean @default(false)
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id], onDelete: Cascade)
+@@unique([restaurantId, dayOfWeek])
+}
+model TableType {
+id String @id @default(uuid())
+restaurantId String
+name String
+--- Page 9 ---
+minCapacity Int
+maxCapacity Int
+quantity Int
+imageUrl String?
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id], onDelete: Cascade)
+}
+model PaymentSettings {
+id String @id @default(uuid())
+restaurantId String @unique
+requireDeposit Boolean @default(false)
+depositType String? // "percentage", "fixed",
+"card_hold"
+depositValue Int? // porcentaje o monto en centavos
+chargeNoShow Boolean @default(false)
+noShowHours Int @default(2)
+allowRefunds Boolean @default(true)
+refundHours Int @default(24)
+paymentGateway String? // "wompi", "payu", "stripe",
+"epayco"
+gatewayConfig Json? // credenciales encriptadas
+acceptCash Boolean @default(true)
+restaurant Restaurant @relation(fields:
+[restaurantId], references: [id], onDelete: Cascade)
+}
+model Branding {
+id String @id @default(uuid())
+restaurantId String @unique
+logoUrl String?
+bannerUrl String?
+--- Page 10 ---
+primaryColor String @default("#000000")
+secondaryColor String @default("#FFFFFF")
+accentColor String @default("#FF6B6B")
+fontFamily String @default("Inter")
+template String @default("modern") // minimal,
+classic, modern, rustic, luxury
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id], onDelete: Cascade)
+}
+API Endpoints necesarios:
+// POST /api/restaurants
+// Crea un nuevo restaurante (Paso 1)
+Body: {
+name: string,
+nit?: string,
+type: string,
+// ... campos del paso 1
+}
+// PUT /api/restaurants/:id/schedules
+// Actualiza horarios (Paso 2)
+Body: {
+schedules: Array<{
+dayOfWeek: number,
+isOpen: boolean,
+shifts: Array<{open: string, close: string}>
+}>
+}
+// POST /api/restaurants/:id/table-types
+// Crea un tipo de mesa (Paso 3)
+Body: {
+--- Page 11 ---
+name: string,
+minCapacity: number,
+maxCapacity: number,
+quantity: number,
+imageUrl?: string
+}
+// PUT /api/restaurants/:id/payment-settings
+// Configura pagos (Paso 4)
+Body: {
+requireDeposit: boolean,
+depositType?: string,
+depositValue?: number,
+// ... más campos
+}
+// POST /api/restaurants/:id/publish
+// Publica el restaurante (Paso 5)
+// Valida que todo esté completo
+// Cambia status a "active"
+// Genera slug único para la URL
+Componentes React a crear:
+1. RestaurantSetupWizard.tsx - Componente principal del wizard
+2. WizardStepIndicator.tsx - Indicador visual de progreso (5 pasos)
+3. StepBasicInfo.tsx - Paso 1
+4. StepSchedules.tsx - Paso 2
+5. StepCapacity.tsx - Paso 3
+6. StepPayments.tsx - Paso 4
+7. StepReview.tsx - Paso 5
+8. ScheduleDayEditor.tsx - Sub-componente para editar un día
+9. TableTypeCard.tsx - Card para tipos de mesa
+10. PaymentGatewaySelector.tsx - Selector de pasarelas
+--- Page 12 ---
+Validaciones con Zod:
+typescript
+import { z } from 'zod';
+export const basicInfoSchema = z.object({
+name: z.string().min(3, "El nombre debe tener al menos 3
+caracteres").max(100),
+nit: z.string().min(5, "El NIT es requerido"),
+type: z.enum(["restaurante", "bar", "cafeteria",
+"foodtruck", "otro"]),
+description: z.string().max(250).optional(),
+address: z.string().min(10, "Dirección completa requerida"),
+city: z.string().min(2),
+phone: z.string().regex(/^\+?[\d\s\-\(\)]+$/, "Teléfono
+inválido"),
+email: z.string().email("Email inválido"),
+website: z.string().url().optional().or(z.literal("")),
+instagram: z.string().optional(),
+facebook: z.string().optional(),
+tiktok: z.string().optional(),
+});
+export const scheduleSchema = z.object({
+dayOfWeek: z.number().min(0).max(6),
+isOpen: z.boolean(),
+shifts: z.array(z.object({
+open: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/,
+"Hora inválida"),
+close: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/,
+"Hora inválida"),
+})).min(1, "Al menos un turno requerido si está abierto"),
+}).refine(data => {
+if (data.isOpen && data.shifts.length === 0) return false;
+return true;
+--- Page 13 ---
+}, "Si está abierto, debe tener al menos un turno");
+export const tableTypeSchema = z.object({
+name: z.string().min(3).max(50),
+minCapacity: z.number().min(1).max(50),
+maxCapacity: z.number().min(1).max(100),
+quantity: z.number().min(1).max(100),
+imageUrl: z.string().url().optional().or(z.literal("")),
+}).refine(data => data.minCapacity <= data.maxCapacity, {
+message: "La capacidad mínima no puede ser mayor a la
+máxima",
+path: ["minCapacity"],
+});
+export const paymentSettingsSchema = z.object({
+requireDeposit: z.boolean(),
+depositType: z.enum(["percentage", "fixed",
+"card_hold"]).optional(),
+depositValue: z.number().optional(),
+chargeNoShow: z.boolean(),
+noShowHours: z.number().min(1).max(24),
+allowRefunds: z.boolean(),
+refundHours: z.number().min(0).max(168),
+paymentGateway: z.enum(["wompi", "payu", "stripe",
+"epayco"]).optional(),
+gatewayConfig: z.any().optional(),
+acceptCash: z.boolean(),
+}).refine(data => {
+if (data.requireDeposit && !data.depositType) return false;
+if (data.requireDeposit && data.depositType === 'percentage'
+&& (!data.depositValue || data.depositValue < 10 ||
+data.depositValue > 100)) return false;
+return true;
+--- Page 14 ---
+}, "Si requiere depósito, debe especificar tipo y valor
+válido");
+UI/UX Requirements:
+● Barra de progreso en la parte superior mostrando los 5 pasos
+● Navegación: Botones "Anterior" y "Siguiente" (excepto en paso 1 no hay
+anterior, en paso 5 no hay siguiente)
+● Auto-guardado cada 30 segundos o al cambiar de paso
+● Indicador visual de campos requeridos (*)
+● Tooltips informativos en campos complejos
+● Validación en tiempo real (onBlur)
+● Mensajes de error claros y específicos
+● Loading states en botones
+● Confirmación antes de salir si hay cambios sin guardar
+● Diseño responsive (móvil primero)
+● Accesibilidad: ARIA labels, keyboard navigation, focus management
+CARACTERÍSTICA 2: EDITOR VISUAL DRAG & DROP
+REQUISITOS FUNCIONALES:
+Crea un editor visual donde el restaurante pueda organizar el orden de las
+secciones de su página de reservas.
+SECCIONES DISPONIBLES (arrastrables):
+1. Hero/Banner (imagen principal con logo)
+2. Información del restaurante (descripción, dirección, horarios)
+3. Menú destacado (galería de platos)
+4. Galería de fotos del local
+5. Reseñas de clientes
+6. Mapa de ubicación
+7. Redes sociales
+8. Formulario de reservas (siempre visible, no se puede quitar)
+--- Page 15 ---
+FUNCIONALIDADES:
+● Drag & drop para reordenar secciones
+● Toggle ON/OFF para mostrar/ocultar cada sección (excepto formulario)
+● Botón "Vista previa" para ver cómo queda
+● Botón "Guardar cambios"
+● Click en una sección → abre panel de configuración lateral
+● Límite: mínimo 2 secciones visibles (hero + formulario)
+● Snap to grid (alineación automática)
+● Undo/Redo de cambios (Ctrl+Z / Ctrl+Y)
+IMPLEMENTACIÓN TÉCNICA:
+Librería: @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities
+Estructura de datos:
+typescript
+interface Section {
+id: string;
+type: 'hero' | 'info' | 'menu' | 'gallery' | 'reviews' |
+'map' | 'social' | 'booking';
+visible: boolean;
+order: number;
+config: Record<string, any>;
+}
+Componentes:
+● VisualEditor.tsx - Contenedor principal
+● DraggableSection.tsx - Wrapper para cada sección arrastrable
+● SectionToolbar.tsx - Controles (mover, editar, eliminar, toggle)
+● EditorSidebar.tsx - Panel de configuración lateral
+● PreviewModal.tsx - Modal de vista previa
+API:
+typescript
+// PUT /api/restaurants/:id/layout
+Body: {
+sections: Array<{
+id: string,
+type: string,
+visible: boolean,
+order: number,
+--- Page 16 ---
+config: any
+}>
+}
+CARACTERÍSTICA 3: SUBIDA DE IMÁGENES CON
+PREVIEW EN VIVO
+REQUISITOS FUNCIONALES:
+Sistema de upload de imágenes con preview inmediato y optimización.
+IMÁGENES REQUERIDAS:
+1. Logo del restaurante (square, min 200x200px, max 2MB, PNG/JPG/SVG)
+2. Banner/Hero (landscape, min 1200x400px, max 5MB, JPG/PNG)
+3. Fotos del local (múltiples, gallery, max 10 fotos, 3MB c/u)
+4. Fotos de platos destacados (múltiples, max 20 fotos, 2MB c/u)
+FUNCIONALIDADES:
+● Drag & drop de archivos
+● Click para seleccionar archivos
+● Preview inmediato después de subir
+● Crop editor integrado (react-easy-crop)
+● Compresión automática de imágenes (sharp o browser-based)
+● Lazy loading en previews
+● Progress bar de subida
+● Reordenamiento de galerías (drag & drop)
+● Eliminar imágenes con confirmación
+● Marca de agua opcional (logo en esquina)
+● Optimización SEO (alt text editable)
+● Generación automática de thumbnails
+IMPLEMENTACIÓN TÉCNICA:
+Librería recomendada: UploadThing (mejor DX) o Cloudinary
+Componentes:
+● ImageUploader.tsx - Componente principal de upload
+● ImageCropper.tsx - Editor de crop
+● ImageGallery.tsx - Grid de imágenes subidas
+● ImagePreview.tsx - Modal de preview grande
+● ProgressBar.tsx - Indicador de progreso
+API:
+typescript
+// POST /api/upload
+--- Page 17 ---
+// Retorna URL firmada para upload directo a S3/Cloudinary
+// DELETE /api/images/:id
+// Elimina imagen
+// PUT /api/images/:id
+// Actualiza metadata (alt text, orden, etc.)
+Database:
+prisma
+model Image {
+id String @id @default(uuid())
+restaurantId String
+url String
+thumbnailUrl String?
+type String // logo, banner, gallery, dish
+altText String?
+order Int @default(0)
+size Int // bytes
+mimeType String
+width Int?
+height Int?
+createdAt DateTime @default(now())
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id], onDelete: Cascade)
+}
+CARACTERÍSTICA 4: SELECTOR DE COLORES CON
+EYEDROPPER
+REQUISITOS FUNCIONALES:
+Sistema inteligente de selección de colores de marca.
+FUNCIONALIDADES:
+1. Color Picker Manual:
+○ Input tipo color nativo + custom
+○ Hex code input (#RRGGBB)
+○ RGB inputs (0-255)
+○ HSL inputs (Hue 0-360, Saturation 0-100, Lightness 0-100)
+○ Presets de colores populares
+2. Eyedropper Automático:
+○ Input: URL del sitio web del restaurante
+○ Proceso:
+--- Page 18 ---
+■ Fetch de la página (proxy para evitar CORS)
+■ Análisis de colores dominantes (usando ColorThief o similar)
+■ Extraer: Primary, Secondary, Accent colors
+■ Mostrar palette de 5-10 colores extraídos
+■ Click en color → aplicar a la configuración
+○ Preview inmediato de cómo se vería
+3. Sugerencias de Paletas:
+○ Basado en el tipo de restaurante:
+■ Italiano → Rojos, verdes, cremas
+■ Japonés → Negros, rojos, blancos
+■ Mexicano → Colores vibrantes (naranja, amarillo, verde)
+■ Francés → Dorados, negros, blancos elegantes
+○ Paletas predefinidas por industria
+4. Accesibilidad:
+○ Validación de contraste WCAG AA/AAA
+○ Alerta si el color de texto no tiene suficiente contraste con el fondo
+○ Sugerencia automática de colores alternativos
+IMPLEMENTACIÓN TÉCNICA:
+Librerías:
+● react-colorful (color picker ligero)
+● node-color-thief o vibrant.js (extraer colores de imágenes)
+● polished (validación de contraste)
+Componentes:
+● ColorPicker.tsx - Picker principal
+● EyedropperTool.tsx - Herramienta de extracción web
+● PaletteSuggestions.tsx - Sugerencias basadas en tipo
+● ContrastChecker.tsx - Validador de accesibilidad
+● ColorPreview.tsx - Preview en componentes reales
+API:
+typescript
+// POST /api/colors/extract
+Body: { url: string }
+Response: {
+dominant: string[],
+palette: {
+primary: string,
+secondary: string,
+accent: string
+}
+}
+--- Page 19 ---
+// POST /api/colors/suggest
+Body: { restaurantType: string }
+Response: {
+palettes: Array<{
+name: string,
+primary: string,
+secondary: string,
+accent: string
+}>
+}
+CARACTERÍSTICA 5: PLANTILLAS PRE-DISEÑADAS
+REQUISITOS FUNCIONALES:
+Sistema de templates para personalización rápida.
+TEMPLATES DISPONIBLES:
+1. Minimalista:
+○ Mucho espacio en blanco
+○ Tipografía sans-serif limpia
+○ Colores neutros
+○ Enfoque en fotos grandes
+○ Ideal: Cafeterías, restaurantes modernos
+2. Clásico:
+○ Tipografía serif elegante
+○ Colores tradicionales (dorado, negro, vino)
+○ Bordes decorativos sutiles
+○ Ideal: Restaurantes fine dining, steakhouses
+3. Moderno:
+○ Gradientes y sombras
+○ Tipografía geométrica
+○ Colores vibrantes
+○ Animaciones suaves
+○ Ideal: Bares, lounges, restaurantes trendy
+4. Rústico:
+○ Texturas de madera/piedra
+○ Tipografía handwritten/manuscrita
+○ Colores tierra (marrón, verde, beige)
+○ Ideal: Parrillas, restaurantes campestres
+5. Lujo:
+○ Tipografía serif muy elegante
+--- Page 20 ---
+○ Colores: Negro, dorado, blanco
+○ Animaciones sofisticadas
+○ Espaciado amplio
+○ Ideal: Restaurantes de alta gama, hoteles
+FUNCIONALIDADES:
+● Preview de cada template antes de aplicar
+● Click "Aplicar template" → carga colores, fuentes, layout predefinidos
+● Personalización posterior permitida (no es lock-in)
+● Template actual marcado visualmente
+● Posibilidad de guardar configuración actual como "Template personalizado"
+IMPLEMENTACIÓN TÉCNICA:
+Estructura de templates:
+typescript
+interface Template {
+id: string;
+name: string;
+category: 'minimal' | 'classic' | 'modern' | 'rustic' |
+'luxury';
+thumbnail: string;
+config: {
+colors: {
+primary: string;
+secondary: string;
+accent: string;
+background: string;
+text: string;
+};
+fonts: {
+heading: string;
+body: string;
+};
+layout: {
+borderRadius: string;
+buttonStyle: string;
+spacing: string;
+};
+};
+}
+const templates: Template[] = [
+{
+id: 'minimal-1',
+--- Page 21 ---
+name: 'Minimalista',
+category: 'minimal',
+thumbnail: '/templates/minimal.jpg',
+config: {
+colors: {
+primary: '#000000',
+secondary: '#666666',
+accent: '#FF6B6B',
+background: '#FFFFFF',
+text: '#1A1A1A',
+},
+fonts: {
+heading: 'Inter',
+body: 'Inter',
+},
+layout: {
+borderRadius: '0px',
+buttonStyle: 'solid',
+spacing: 'large',
+},
+},
+},
+// ... más templates
+];
+Componentes:
+● TemplateGallery.tsx - Grid de templates disponibles
+● TemplateCard.tsx - Card individual con preview
+● TemplatePreviewModal.tsx - Vista completa antes de aplicar
+● TemplateCustomizer.tsx - Ajustes post-aplicación
+API:
+typescript
+// GET /api/templates
+// Retorna lista de templates disponibles
+// POST /api/restaurants/:id/apply-template
+Body: { templateId: string }
+// Aplica configuración del template al restaurante
+CARACTERÍSTICA 6: VISTA PREVIA EN TIEMPO REAL
+REQUISITOS FUNCIONALES:
+--- Page 22 ---
+Preview en vivo de cómo se verá la página de reservas mientras se configura.
+FUNCIONALIDADES:
+● Split view: Izquierda (configuración) | Derecha (preview)
+● Toggle entre vista móvil/tablet/desktop
+● Actualización en tiempo real (sin refresh) al cambiar:
+○ Colores
+○ Fuentes
+○ Imágenes
+○ Textos
+○ Layout
+● Zoom in/out del preview
+● Rotación de dispositivo (portrait/landscape)
+● Botón "Abrir en nueva pestaña" (vista completa)
+● Simulación de flujo de reserva completo
+IMPLEMENTACIÓN TÉCNICA:
+Componentes:
+● LivePreview.tsx - Contenedor principal del preview
+● DeviceFrame.tsx - Marco de dispositivo (iPhone, iPad, Desktop)
+● PreviewToolbar.tsx - Controles de dispositivo/tamaño
+● PreviewRenderer.tsx - Renderiza el componente con la configuración
+actual
+Lógica:
+t
+typescript
+// Usar iframe o component composition
+// Opción 1: iframe (mejor aislamiento)
+<iframe
+src={`/preview/${restaurantId}`}
+title="Preview"
+className="w-full h-full"
+/>
+// Opción 2: Component composition (más rápido, menos
+realista)
+<RestaurantPage
+config={currentConfig}
+previewMode={true}
+/>
+API:
+typescript
+// GET /api/restaurants/:id/preview
+--- Page 23 ---
+// Retorna configuración actual para el preview
+// (Incluso si está en borrador)
+CARACTERÍSTICA 7: IMPORTACIÓN DESDE GOOGLE
+BUSINESS
+REQUISITOS FUNCIONALES:
+Importación automática de datos desde Google Business Profile.
+FUNCIONALIDADES:
+1. Búsqueda de Negocio:
+○ Input: Nombre del restaurante o URL de Google Maps
+○ Autocomplete de Google Places API
+○ Selección del negocio correcto
+2. Datos a Importar:
+○ Nombre
+○ Dirección completa
+○ Teléfono
+○ Sitio web
+○ Horarios de atención
+○ Categoría/tipo de restaurante
+○ Fotos (logo, interior, exterior, comida)
+○ Reseñas (rating promedio, número de reseñas)
+3. Proceso:
+○ Paso 1: Buscar negocio → seleccionar
+○ Paso 2: Preview de datos encontrados
+○ Paso 3: Checkbox por cada campo a importar
+○ Paso 4: Confirmar importación
+○ Paso 5: Mapeo automático a campos del sistema
+IMPLEMENTACIÓN TÉCNICA:
+Google Places API setup:
+● Necesario: API Key con Places API habilitado
+● Endpoint: Text Search / Place Details
+Componentes:
+● GoogleBusinessImport.tsx - Wizard de importación
+● BusinessSearch.tsx - Input con autocomplete
+● DataPreview.tsx - Vista previa de datos encontrados
+● FieldMapping.tsx - Checkbox de campos a importar
+API:
+--- Page 24 ---
+typescript
+// POST /api/integrations/google-places/search
+Body: { query: string }
+Response: {
+places: Array<{
+placeId: string,
+name: string,
+address: string,
+rating?: number,
+photoUrl?: string,
+}>
+}
+// POST /api/integrations/google-places/details
+Body: { placeId: string }
+Response: {
+name: string,
+address: string,
+phone: string,
+website?: string,
+openingHours?: Array<{
+day: number,
+open: string,
+close: string,
+}>,
+photos: string[],
+rating?: number,
+reviews?: number,
+}
+// POST /api/restaurants/:id/import-google
+Body: {
+placeId: string,
+fields: string[] // campos a importar
+}
+CARACTERÍSTICA 8: GENERADOR AUTOMÁTICO DE
+QR
+REQUISITOS FUNCIONALES:
+Generación y descarga de códigos QR para el restaurante.
+FUNCIONALIDADES:
+--- Page 25 ---
+1. QR Generados Automáticamente:
+○ QR de página de reservas (URL única del restaurante)
+○ QR por mesa (si el restaurante configura números de mesa)
+○ QR de menú digital (opcional)
+2. Personalización del QR:
+○ Color del QR (default: negro, editable)
+○ Logo en el centro (upload del logo del restaurante)
+○ Borde/frame personalizado
+○ Texto debajo del QR (editable: "Escanea para reservar")
+3. Descargas:
+○ PNG (alta resolución, 300 DPI)
+○ SVG (vectorial, escalable)
+○ PDF (listo para imprimir, tamaño A4 o carta)
+○ ZIP con múltiples QRs (si hay varias mesas)
+4. Templates de Impresión:
+○ Card de mesa (10x15 cm)
+○ Sticker redondo (8 cm diámetro)
+○ Poster A4 (para entrada del local)
+○ Menú insert (cuarto de carta)
+IMPLEMENTACIÓN TÉCNICA:
+Librerías:
+● qrcode.react o node-qrcode (generación)
+● jsPDF (generación de PDF)
+● html2canvas (captura de previews)
+Componentes:
+● QRGenerator.tsx - Componente principal
+● QRPreview.tsx - Preview en tiempo real
+● QRDownloadModal.tsx - Opciones de descarga
+● QRTableManager.tsx - Gestión de QRs por mesa
+API:
+typescript
+// GET /api/restaurants/:id/qr
+Response: {
+url: string,
+qrCode: string, // base64 o URL
+}
+// POST /api/restaurants/:id/qr/customize
+Body: {
+color: string,
+--- Page 26 ---
+logoUrl?: string,
+text?: string,
+}
+// POST /api/restaurants/:id/qr/download
+Body: {
+format: 'png' | 'svg' | 'pdf',
+tables?: number[], // si es null, genera QR general
+}
+CARACTERÍSTICA 9: DOMINIO PERSONALIZADO
+REQUISITOS FUNCIONALES:
+Configuración de dominio personalizado para la página de reservas.
+FUNCIONALIDADES:
+1. Opciones de Dominio:
+○ Subdominio gratuito: restaurante.tuapp.com (automático)
+○ Dominio personalizado: reservas.mirestaurante.com (CNAME)
+○ Dominio raíz: mirestaurante.com (A record)
+2. Proceso de Configuración:
+○ Input: Dominio deseado
+○ Validación de disponibilidad
+○ Instrucciones de DNS (paso a paso según proveedor: GoDaddy,
+Namecheap, etc.)
+○ Verificación automática de DNS (polling cada 30s)
+○ Certificado SSL automático (Let's Encrypt)
+3. Validaciones:
+○ Verificar que el dominio no esté en uso
+○ Validar formato de dominio válido
+○ Check de DNS propagation
+○ SSL status
+IMPLEMENTACIÓN TÉCNICA:
+Infraestructura:
+● Vercel Edge Config o similar para mapeo de dominios
+● Middleware para routing basado en host
+● Automatización de SSL
+Componentes:
+● CustomDomain.tsx - Configuración principal
+● DomainInput.tsx - Input con validación
+--- Page 27 ---
+● DNSInstructions.tsx - Guía paso a paso por proveedor
+● DomainVerification.tsx - Status de verificación en tiempo real
+● SSLStatus.tsx - Indicador de certificado SSL
+API:
+typescript
+// POST /api/restaurants/:id/domain
+Body: { domain: string }
+// Valida disponibilidad y crea registro
+// GET /api/restaurants/:id/domain/verify
+// Verifica configuración DNS
+// DELETE /api/restaurants/:id/domain
+// Elimina dominio personalizado
+// POST /api/restaurants/:id/domain/ssl
+// Solicita/renueva certificado SSL
+Database:
+prisma
+model CustomDomain {
+id String @id @default(uuid())
+restaurantId String @unique
+domain String @unique
+status String @default("pending") // pending,
+verified, failed
+sslStatus String @default("pending") // pending,
+active, failed
+verifiedAt DateTime?
+createdAt DateTime @default(now())
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id], onDelete: Cascade)
+}
+CARACTERÍSTICA 10: WIDGET EMBEBIBLE
+REQUISITOS FUNCIONALES:
+Código embebible para integrar el sistema de reservas en la web existente del
+restaurante.
+FUNCIONALIDADES:
+1. Tipos de Widget:
+--- Page 28 ---
+○ Botón flotante (floating action button)
+○ Widget inline (incrustado en la página)
+○ Popup/modal (se abre al hacer click)
+○ Full page (redirección)
+2. Personalización del Widget:
+○ Color del botón
+○ Texto del botón ("Reservar mesa", "Book now", etc.)
+○ Posición (esquina inferior derecha/izquierda, centro)
+○ Tamaño (pequeño, mediano, grande)
+○ Icono (calendario, utensilios, personalizado)
+3. Código Generado:
+○ JavaScript snippet (copy-paste)
+○ iframe embed code
+○ WordPress plugin (shortcode)
+○ Shopify app block
+4. Preview:
+○ Vista previa en vivo del widget
+○ Simulación de diferentes dispositivos
+○ Test de funcionalidad
+IMPLEMENTACIÓN TÉCNICA:
+Widget code example:
+html
+<!-- Floating Button -->
+<script src="https://tuapp.com/widget.js"></script>
+<script>
+RestaurantBooking.init({
+restaurantId: 'uuid-del-restaurante',
+theme: {
+primaryColor: '#FF6B6B',
+buttonPosition: 'bottom-right',
+buttonText: 'Reservar mesa',
+},
+onSuccess: function(bookingId) {
+console.log('Reserva creada:', bookingId);
+}
+});
+</script>
+Componentes:
+● WidgetGenerator.tsx - Configurador del widget
+● WidgetPreview.tsx - Preview en vivo
+● CodeSnippet.tsx - Display del código con copy button
+--- Page 29 ---
+● WidgetSettings.tsx - Formularios de personalización
+API:
+typescript
+// GET /api/restaurants/:id/widget/config
+Response: {
+scriptUrl: string,
+restaurantId: string,
+defaultConfig: {
+theme: {...},
+language: string,
+}
+}
+RESUMEN DE ENTREGABLES ESPERADOS
+Después de implementar este módulo, debes tener:
+✅ Frontend:
+● Wizard de 5 pasos funcional y validado
+● Editor drag & drop operativo
+● Sistema de upload de imágenes completo
+● Color picker con eyedropper
+● Galería de templates aplicables
+● Preview en tiempo real
+● Importación desde Google Business
+● Generador de QRs descargables
+● Configuración de dominio personalizado
+● Generador de código widget
+✅ Backend:
+● API REST completa para restaurantes
+● Base de datos con todas las tablas relacionadas
+● Integración con Google Places API
+● Sistema de upload de archivos
+● Generación de QRs
+● Validación de dominios DNS
+✅ UX/UI:
+● Diseño responsive y accesible
+● Loading states y error handling
+● Auto-guardado
+● Validaciones en tiempo real
+--- Page 30 ---
+● Tooltips y ayuda contextual
+INSTRUCCIONES PARA ANTIGRAVITY
+1. Comienza con el setup del proyecto (Next.js, TypeScript, Tailwind, Prisma)
+2. Crea el schema de base de datos y ejecuta las migraciones
+3. Implementa la autenticación (registro/login de restaurantes)
+4. Desarrolla el wizard paso a paso (Paso 1 → Paso 5)
+5. Agrega las características avanzadas (editor, QR, dominios, etc.)
+6. Asegura la calidad (tests, validaciones, error handling)
+7. Documenta (README, comentarios en código crítico)
+Prioridad:
+1. Wizard de configuración (core)
+2. Preview en tiempo real (UX crítica)
+3. Upload de imágenes
+4. Generación de QR
+5. Resto de características
+Nota: Cada característica debe ser funcional independientemente, pero integrarse
+perfectamente con las demás.
+
+================================================================================
+FILE: agendamiento modulo 2.pdf
+================================================================================
+
+--- Page 1 ---
+PROMPT TÉCNICO PARA ANTIGRAVITY - MÓDULO 2:
+SISTEMA DE RESERVAS (FRONTEND DEL CLIENTE)
+markdown
+# CONTEXTO DEL MÓDULO 2
+Estás construyendo el FRONTEND PÚBLICO de reservas para
+restaurantes (la página que ven los clientes finales).
+Este módulo se integra con Cal.com como backend de reservas
+(self-hosted).
+El flujo debe ser: Selección de Sede → Número de Personas →
+Fecha/Hora → Datos → Pago (si aplica) → Confirmación.
+STACK TECNOLÓGICO:
+- Frontend: Next.js 14+ (App Router), TypeScript, TailwindCSS
+- UI Components: shadcn/ui, Radix UI
+- Calendar: react-day-picker + date-fns
+- Maps: @react-google-maps/api o Leaflet
+- Forms: React Hook Form + Zod validation
+- State Management: Zustand (para el flujo multi-paso)
+- Animations: framer-motion (transiciones suaves entre pasos)
+- QR Code: qrcode.react
+- Payments: SDKs de Wompi/Stripe/PayU según configuración
+- API Client: Axios o fetch nativo con SWR/React Query
+- Internationalization: next-intl (multi-idioma)
+- Real-time: WebSocket o Server-Sent Events para
+disponibilidad
+---
+## ARQUITECTURA DEL FLUJO DE RESERVA
+**ESTRUCTURA DE PASOS:**
+Paso 0: Selección de Restaurante/Sede (si es cadena)
+↓
+Paso 1: Número de Personas + Tipo de Evento
+↓
+Paso 2: Fecha y Hora Disponible
+↓
+Paso 3: Datos del Cliente (Guest o Login)
+↓
+Paso 4: Confirmación y Pago (si aplica depósito)
+--- Page 2 ---
+↓
+Paso 5: Éxito + QR de Confirmación
+**ESTADO GLOBAL (Zustand Store):**
+```typescript
+interface BookingState {
+// Paso 0
+restaurant: Restaurant | null;
+branch: Branch | null;
+// Paso 1
+partySize: number;
+eventType: string;
+specialRequests: string;
+// Paso 2
+selectedDate: Date | null;
+selectedTime: string | null;
+// Paso 3
+customer: {
+name: string;
+email: string;
+phone: string;
+isNewCustomer: boolean;
+};
+// Paso 4
+paymentMethod: string | null;
+depositAmount: number | null;
+// Paso 5
+bookingId: string | null;
+qrCode: string | null;
+// Metadata
+currentStep: number;
+isProcessing: boolean;
+errors: Record<string, string>;
+// Actions
+setRestaurant: (restaurant: Restaurant) => void;
+--- Page 3 ---
+setBranch: (branch: Branch) => void;
+setPartySize: (size: number) => void;
+setEventType: (type: string) => void;
+setSpecialRequests: (requests: string) => void;
+setSelectedDate: (date: Date) => void;
+setSelectedTime: (time: string) => void;
+setCustomer: (customer: Partial<Customer>) => void;
+setPaymentMethod: (method: string) => void;
+setBookingId: (id: string) => void;
+setCurrentStep: (step: number) => void;
+reset: () => void;
+}
+PASO 0: SELECCIÓN DE RESTAURANTE/SEDE
+REQUISITOS FUNCIONALES:
+Pantalla inicial que muestra las opciones disponibles para el cliente.
+ESCENARIO A: Un solo restaurante (sin sucursales)
+● Redirige automáticamente al Paso 1
+● No muestra esta pantalla
+ESCENARIO B: Cadena con múltiples sedes
+● Grid de cards visuales (2 columnas en móvil, 3-4 en desktop)
+● Cada card muestra:
+○ Foto principal de la sede (16:9 aspect ratio)
+○ Nombre de la sede
+○ Dirección completa
+○ Distancia desde la ubicación del usuario (si permite geolocalización)
+○ Rating promedio (estrellas)
+○ Horario actual (Abierto/Cerrado + hora de cierre)
+○ Badge "Más popular" o "Cerca de ti" si aplica
+● Barra de búsqueda por ciudad/barrio
+● Filtros:
+○ "Cerca de mí" (geolocalización)
+○ "Abierto ahora"
+○ "Con disponibilidad hoy"
+● Ordenamiento:
+○ Más cercano (default si geolocalización)
+○ Más popular
+○ Mejor rating
+● Click en card → selecciona sede y avanza al Paso 1
+● Botón "Ver todas las sedes" si hay más de 6
+--- Page 4 ---
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// BranchSelector.tsx
+interface BranchSelectorProps {
+branches: Branch[];
+onSelect: (branch: Branch) => void;
+userLocation?: { lat: number; lng: number };
+}
+// BranchCard.tsx
+interface BranchCardProps {
+branch: Branch;
+distance?: number;
+isSelected?: boolean;
+onClick: () => void;
+}
+// BranchFilters.tsx
+interface BranchFiltersProps {
+onFilterChange: (filters: BranchFilters) => void;
+filters: BranchFilters;
+}
+API Endpoints:
+typescript
+// GET /api/branches?restaurantId={id}
+Response: {
+branches: Array<{
+id: string,
+name: string,
+address: string,
+city: string,
+lat: number,
+lng: number,
+photoUrl: string,
+rating: number,
+reviewCount: number,
+openingHours: {
+dayOfWeek: number,
+shifts: Array<{open: string, close: string}>,
+}[],
+isOpenNow: boolean,
+hasAvailabilityToday: boolean,
+}>
+--- Page 5 ---
+}
+// GET /api/branches/{id}/availability?date={YYYY-MM-DD}
+Response: {
+availableSlots: string[], // ["12:00", "12:30", "13:00",
+...]
+totalCapacity: number,
+bookedCount: number,
+}
+Cálculo de Distancia:
+typescript
+import { getDistance } from 'geolib';
+function calculateDistance(
+userLocation: { lat: number; lng: number },
+branchLocation: { lat: number; lng: number }
+): number {
+return getDistance(userLocation, branchLocation); // metros
+}
+function formatDistance(meters: number): string {
+if (meters < 1000) return `${Math.round(meters)}m`;
+return `${(meters / 1000).toFixed(1)}km`;
+}
+UI/UX:
+● Skeleton loaders mientras cargan las sedes
+● Animación de fade-in al aparecer las cards
+● Hover effect en desktop (scale 1.02 + shadow)
+● Click feedback (ripple effect)
+● Responsive: 1 columna móvil, 2 tablet, 3-4 desktop
+● Accesibilidad: ARIA labels, keyboard navigation (Tab + Enter)
+PASO 1: NÚMERO DE PERSONAS + TIPO DE EVENTO
+REQUISITOS FUNCIONALES:
+Pantalla para definir el tamaño del grupo y el tipo de ocasión.
+SECCIÓN 1: NÚMERO DE PERSONAS
+● Pregunta: "¿Para cuántas personas?"
+● Selector visual (NO dropdown):
+○ Botones grandes y táctiles: 1, 2, 3, 4, 5, 6, 7, 8
+--- Page 6 ---
+○ Botón "+ Más personas" (abre input numérico)
+○ Input numérico con min: 1, max: capacidad máxima del restaurante
+○ Validación: no puede ser mayor a la capacidad máxima configurada
+● Indicador visual: icono de personas que cambia según la selección
+● Mensaje dinámico:
+○ Si selecciona 1-2: "Mesa romántica o individual"
+○ Si selecciona 3-6: "Mesa para grupo"
+○ Si selecciona 7-10: "Mesa grande"
+○ Si selecciona +10: "Evento especial (requiere confirmación)"
+SECCIÓN 2: TIPO DE EVENTO (OPCIONAL)
+● Pregunta: "¿Qué tipo de ocasión es?"
+● Selector de opciones (cards con iconos):
+○ 🍽 Cena casual (default)
+○ 💑 Cena romántica
+○ 🎂 Cumpleaños
+○ 💼 Reunión de negocios
+○ 🎉 Celebración especial
+○ 󰔡 Comida familiar
+○ 🥂 Aniversario
+○ Otro (input libre)
+● Selección múltiple NO permitida
+● Campo opcional (puede saltarlo)
+SECCIÓN 3: SOLICITUDES ESPECIALES (OPCIONAL)
+● Textarea: "¿Alguna solicitud especial?"
+● Placeholder: "Ej: Silla alta para bebé, alergias, mesa cerca de la ventana..."
+● Max: 500 caracteres
+● Contador de caracteres
+● Chips de sugerencias rápidas (click para agregar):
+○ "Silla alta"
+○ "Accesibilidad wheelchair"
+○ "Mesa tranquila"
+○ "Vista panorámica"
+○ "Alergias alimentarias" (abre input para especificar)
+VALIDACIONES:
+● Número de personas: requerido, min 1, max capacidad del restaurante
+● Si supera capacidad máxima: mostrar mensaje "Para grupos de más de X
+personas, por favor contáctanos directamente"
+● Tipo de evento: opcional
+● Solicitudes especiales: opcional, max 500 chars
+--- Page 7 ---
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// PartySizeSelector.tsx
+interface PartySizeSelectorProps {
+value: number;
+onChange: (size: number) => void;
+maxCapacity: number;
+disabled?: boolean;
+}
+// EventTypeSelector.tsx
+interface EventTypeSelectorProps {
+value: string;
+onChange: (type: string) => void;
+}
+// SpecialRequests.tsx
+interface SpecialRequestsProps {
+value: string;
+onChange: (requests: string) => void;
+maxLength?: number;
+}
+// StepOne.tsx (contenedor principal)
+Validaciones con Zod:
+typescript
+import { z } from 'zod';
+export const stepOneSchema = z.object({
+partySize: z.number()
+.min(1, "Debe seleccionar al menos 1 persona")
+.max(50, "El grupo es demasiado grande"),
+eventType: z.string().optional(),
+specialRequests: z.string().max(500, "Máximo 500
+caracteres").optional(),
+});
+export type StepOneData = z.infer<typeof stepOneSchema>;
+UI/UX:
+● Botones de número de personas: 48x48px mínimo (táctil)
+--- Page 8 ---
+● Animación de selección (bounce effect)
+● Transición suave al cambiar de paso (framer-motion)
+● Mensajes de error inline (debajo del campo)
+● Tooltip explicativo en "Más personas"
+● Iconos SVG inline (no dependencias externas pesadas)
+● Accesibilidad: ARIA labels, keyboard navigation, focus
+visible
+PASO 2: FECHA Y HORA DISPONIBLE
+REQUISITOS FUNCIONALES:
+Pantalla para seleccionar fecha y hora de la reserva.
+VISTA UNIFICADA (NO dos pasos separados):
+En lugar de tener "Paso 2A: Fecha" y "Paso 2B: Hora",
+mostramos AMBOS en la misma pantalla.
+LAYOUT (Desktop):
+┌─────────────────────────────────────────┐
+│ Calendario (Izquierda) │ Horarios │
+│ │ (Derecha) │
+│ [Lun Mar Mie Jue Vie] │ [12:00] │
+│ [1 2 3 4 5 ] │ [12:30] │
+│ [6 7 8 9 10 ] │ [13:00] │
+│ [...] │ [13:30] │
+│ │ [...] │
+└─────────────────────────────────────────┘
+LAYOUT (Móvil):
+┌─────────────────────┐
+│ Calendario │
+│ [Lun Mar Mie Jue] │
+│ [1 2 3 4 ] │
+│ [5 6 7 8 ] │
+│ │
+│ Horarios │
+│ [12:00] [12:30] │
+│ [13:00] [13:30] │
+│ [14:00] [14:30] │
+└─────────────────────┘
+SECCIÓN 1: CALENDARIO
+--- Page 9 ---
+● Componente: react-day-picker
+● Rango de fechas:
+○ Mínimo: Hoy (o mañana si es muy tarde para reservar hoy)
+○ Máximo: 60 días en el futuro (configurable por restaurante)
+● Indicadores visuales en cada día:
+○ 🟢 Verde: Disponible (hay horarios libres)
+○ 🟡 Amarillo: Poca disponibilidad (últimas mesas)
+○ 🔴 Rojo: Lleno (no hay disponibilidad)
+○ ⚫ Gris: Cerrado (el restaurante no abre ese día)
+● Navegación:
+○ Flechas para cambiar de mes
+○ Click en día → carga los horarios disponibles en el panel derecho
+○ Días pasados: deshabilitados
+● Selector de "Vista rápida":
+○ Botones: "Hoy", "Mañana", "Próximos 7 días"
+○ Click en "Hoy" → selecciona hoy y carga horarios
+SECCIÓN 2: HORARIOS DISPONIBLES
+● Grid de time slots (botones)
+● Cada slot muestra:
+○ Hora (formato 12h o 24h según configuración)
+○ Badge si es "Última mesa" o "Happy Hour"
+● Estados de cada slot:
+○ Disponible: botón normal, clickable
+○ Última mesa: badge amarillo, clickable
+○ Lleno: botón deshabilitado, tachado
+○ Seleccionado: botón con color primario, checkmark
+● Ordenamiento:
+○ Cronológico (12:00, 12:30, 13:00, ...)
+○ Agrupación por turnos si aplica:
+■ "Almuerzo" (12:00 - 15:00)
+■ "Cena" (19:00 - 23:00)
+● Filtros (opcional):
+○ "Solo almuerzo"
+○ "Solo cena"
+○ "Horarios con descuento"
+● Scroll horizontal si hay muchos horarios
+SECCIÓN 3: INFORMACIÓN ADICIONAL
+● Mensaje dinámico según selección:
+○ "Has seleccionado: Viernes 15 de Marzo a las 20:00 para 4 personas"
+● Duración estimada de la reserva (ej: "Duración aproximada: 1h 30m")
+● Política de cancelación (ej: "Cancelación gratuita hasta 2h antes")
+--- Page 10 ---
+● Mensaje si no hay disponibilidad:
+○ "Lo sentimos, no hay disponibilidad para esa fecha"
+○ Sugerencia: "¿Te parece bien el sábado a las 19:30?"
+○ Botón "Ver otras fechas"
+VALIDACIONES:
+● Fecha: requerida, no puede ser pasada
+● Hora: requerida, debe estar en la lista de disponibles
+● Si cambia la fecha, se resetea la hora seleccionada
+● Si cambia el número de personas, se recalcula la disponibilidad
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// DateTimeSelector.tsx (contenedor principal)
+interface DateTimeSelectorProps {
+restaurantId: string;
+branchId: string;
+partySize: number;
+selectedDate: Date | null;
+selectedTime: string | null;
+onDateChange: (date: Date) => void;
+onTimeChange: (time: string) => void;
+}
+// AvailabilityCalendar.tsx
+interface AvailabilityCalendarProps {
+restaurantId: string;
+branchId: string;
+partySize: number;
+selectedDate: Date | null;
+onDateSelect: (date: Date) => void;
+minDate?: Date;
+maxDate?: Date;
+}
+// TimeSlotsGrid.tsx
+interface TimeSlotsGridProps {
+date: Date;
+availableSlots: TimeSlot[];
+selectedTime: string | null;
+onTimeSelect: (time: string) => void;
+--- Page 11 ---
+timeFormat?: '12h' | '24h';
+}
+// TimeSlotButton.tsx
+interface TimeSlotButtonProps {
+time: string;
+isAvailable: boolean;
+isSelected: boolean;
+isLastTable?: boolean;
+onClick: () => void;
+}
+API Endpoints:
+typescript
+// GET /api/restaurants/{id}/branches/{branchId}/availability
+Query params:
+- startDate: YYYY-MM-DD
+- endDate: YYYY-MM-DD
+- partySize: number
+Response: {
+dates: {
+[date: string]: {
+status: 'available' | 'limited' | 'full' | 'closed',
+slots: Array<{
+time: string, // "12:00"
+available: boolean,
+isLastTable: boolean,
+hasDiscount: boolean,
+}>
+}
+}
+}
+// GET /api/restaurants/{id}/branches/{branchId}/slots
+Query params:
+- date: YYYY-MM-DD
+- partySize: number
+Response: {
+slots: Array<{
+time: string,
+available: boolean,
+isLastTable: boolean,
+hasDiscount: boolean,
+--- Page 12 ---
+discountPercentage?: number,
+}>
+}
+Integración con Cal.com:
+// Función para obtener disponibilidad desde Cal.com
+async function getCalComAvailability(
+eventTypeId: number,
+startDate: string,
+endDate: string
+): Promise<AvailabilityResponse> {
+const response = await fetch(
+`${CALCOM_API_URL}/api/v2/availability?eventTypeId=${eventTypeId}&startDate=$
+{startDate}&endDate=${endDate}`,
+{
+headers: {
+'Authorization': `Bearer ${CALCOM_API_KEY}`,
+},
+}
+);
+if (!response.ok) throw new Error('Failed to fetch availability');
+return response.json();
+}
+UI/UX:
+● Skeleton loaders para calendario y horarios
+● Animación de transición al cambiar de mes
+● Hover effect en días y time slots
+● Feedback táctil en móvil (vibración ligera si es soportada)
+● Scroll suave al seleccionar un día (en móvil, hace scroll a los horarios)
+● Mensajes de error claros si no hay disponibilidad
+● Accesibilidad: ARIA labels, keyboard navigation, focus management
+PASO 3: DATOS DEL CLIENTE
+REQUISITOS FUNCIONALES:
+Pantalla para capturar la información del cliente.
+ENFOQUE: GUEST-FIRST (sin fricción)
+--- Page 13 ---
+El cliente NO necesita crear una cuenta para reservar.
+OPCIÓN A: RESERVAR COMO INVITADO (Default)
+Campos requeridos:
+● Nombre completo (texto)
+● Email (email, validación)
+● Teléfono (tel, validación de formato)
+Campos opcionales:
+● "Crear cuenta para próximas reservas" (checkbox)
+○ Si marca: pide contraseña y confirma email
+○ Si no marca: solo guarda los datos para esta reserva
+OPCIÓN B: LOGIN RÁPIDO (si ya tiene cuenta)
+● Botones de login social:
+○ Google (OAuth)
+○ Facebook (OAuth)
+○ Apple (OAuth)
+● Login con email + contraseña
+● "¿Olvidaste tu contraseña?" (link)
+● Autocompletado: si ya reservó antes con ese email, precarga los datos
+VALIDACIONES:
+● Nombre: requerido, min 2 chars, max 100 chars
+● Email: requerido, formato válido, verificación de existencia (opcional)
+● Teléfono: requerido, formato válido (validación por país)
+● Contraseña (si crea cuenta): min 8 chars, 1 mayúscula, 1 número
+CAMPOS ADICIONALES (OPCIONAL):
+● "¿Es tu primera vez en este restaurante?" (Sí/No)
+● "¿Cómo nos encontraste?" (select: Google, Instagram, Recomendación, Otro)
+● "¿Quieres recibir promociones por email?" (checkbox, default NO)
+PRIVACIDAD:
+● Checkbox: "Acepto la política de privacidad" (requerido)
+● Checkbox: "Acepto los términos y condiciones" (requerido)
+● Link a documentos legales
+● Mensaje: "Tus datos están seguros y nunca serán compartidos"
+REQUISITOS TÉCNICOS:
+Componentes:
+--- Page 14 ---
+typescript
+// CustomerForm.tsx
+interface CustomerFormProps {
+customer: Customer | null;
+onChange: (customer: Partial<Customer>) => void;
+isGuest: boolean;
+onCreateAccount?: () => void;
+onLogin?: () => void;
+}
+// SocialLoginButtons.tsx
+interface SocialLoginButtonsProps {
+onGoogleLogin: () => void;
+onFacebookLogin: () => void;
+onAppleLogin: () => void;
+}
+// GuestToggle.tsx
+interface GuestToggleProps {
+isGuest: boolean;
+onToggle: () => void;
+}
+Validaciones con Zod:
+import { z } from 'zod';
+export const customerSchema = z.object({
+name: z.string()
+.min(2, "El nombre debe tener al menos 2 caracteres")
+.max(100, "El nombre es demasiado largo"),
+email: z.string().email("Email inválido"),
+phone: z.string()
+.regex(/^\+?[\d\s\-\(\)]{10,15}$/, "Teléfono inválido"),
+password: z.string()
+.min(8, "La contraseña debe tener al menos 8 caracteres")
+.regex(/[A-Z]/, "Debe tener al menos 1 mayúscula")
+.regex(/[0-9]/, "Debe tener al menos 1 número")
+.optional(),
+acceptsPrivacy: z.boolean().refine(val => val === true, {
+message: "Debes aceptar la política de privacidad",
+}),
+acceptsTerms: z.boolean().refine(val => val === true, {
+message: "Debes aceptar los términos y condiciones",
+}),
+--- Page 15 ---
+});
+export type CustomerData = z.infer<typeof customerSchema>;
+Autenticación (NextAuth.js):
+// pages/api/auth/[...nextauth].ts
+import NextAuth from 'next-auth';
+import GoogleProvider from 'next-auth/providers/google';
+import FacebookProvider from 'next-auth/providers/facebook';
+import CredentialsProvider from 'next-auth/providers/credentials';
+export default NextAuth({
+providers: [
+GoogleProvider({
+clientId: process.env.GOOGLE_CLIENT_ID!,
+clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+}),
+FacebookProvider({
+clientId: process.env.FACEBOOK_CLIENT_ID!,
+clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
+}),
+CredentialsProvider({
+name: 'Credentials',
+credentials: {
+email: { label: "Email", type: "email" },
+password: { label: "Password", type: "password" }
+},
+async authorize(credentials) {
+// Validar credenciales contra base de datos
+const user = await prisma.user.findUnique({
+where: { email: credentials.email },
+});
+if (user && await bcrypt.compare(credentials.password, user.password)) {
+return user;
+}
+return null;
+}
+}),
+],
+// ... más configuración
+});
+API Endpoints:
+typescript
+// POST /api/customers
+--- Page 16 ---
+// Crea o actualiza un cliente
+Body: {
+name: string,
+email: string,
+phone: string,
+password?: string, // si crea cuenta
+acceptsPrivacy: boolean,
+acceptsTerms: boolean,
+}
+Response: {
+customerId: string,
+isNew: boolean,
+}
+// POST /api/customers/verify-email
+Body: { email: string }
+Response: {
+exists: boolean,
+suggestedAction: 'login' | 'create_account' |
+'continue_as_guest',
+}
+UI/UX:
+● Autocompletado de navegador (autocomplete="name", autocomplete="email",
+etc.)
+● Máscara de teléfono según país (ej: +57 300 123 4567)
+● Validación en tiempo real (onBlur)
+● Indicador de fortaleza de contraseña (si crea cuenta)
+● Toggle entre "Invitado" y "Login" sin recargar página
+● Mensajes de error claros y específicos
+● Accesibilidad: ARIA labels, keyboard navigation, focus management
+PASO 4: CONFIRMACIÓN Y PAGO
+REQUISITOS FUNCIONALES:
+Pantalla de resumen y procesamiento de pago (si aplica depósito).
+SECCIÓN 1: RESUMEN DE LA RESERVA
+Card con toda la información:
+● 📍 Restaurante: Nombre + Dirección
+● 📅 Fecha: Día de semana, fecha completa
+● 🕐 Hora: Hora seleccionada
+--- Page 17 ---
+● 👥 Personas: Número de comensales
+● 🎉 Tipo de evento: (si seleccionó)
+● 📝 Solicitudes especiales: (si agregó)
+● 👤 Cliente: Nombre + Email + Teléfono
+● ⏱ Duración estimada: (ej: 1h 30m)
+● 📋 Política de cancelación: (ej: "Gratis hasta 2h antes")
+Botón: "Editar reserva" (vuelve al paso correspondiente)
+SECCIÓN 2: PAGO (SI APLICA DEPÓSITO)
+Escenario A: NO requiere depósito
+● Mensaje: "No se requiere pago anticipado"
+● Botón: "Confirmar reserva"
+● Avanza directamente al Paso 5
+Escenario B: Requiere depósito
+Información del pago:
+● Monto del depósito: $X (o X% del estimado)
+● Concepto: "Depósito para reserva el [fecha]"
+● Política: "100% consumible en tu visita"
+● Política de reembolso: "Reembolso completo si cancelas con 24h de
+anticipación"
+Métodos de pago disponibles:
+● 💳 Tarjeta de crédito/débito (default)
+● 📱 PSE (Colombia)
+● 💰 Efectivo en el local (si el restaurante lo permite)
+● 🏦 Transferencia bancaria (si aplica)
+Formulario de tarjeta:
+● Número de tarjeta (con formateo automático: 4242 4242 4242 4242)
+● Fecha de expiración (MM/YY)
+● CVV (3-4 dígitos)
+● Nombre del titular (como aparece en la tarjeta)
+● Checkbox: "Guardar tarjeta para futuras reservas" (opcional)
+Botones:
+● "Pagar $X y confirmar reserva" (botón principal)
+● "Cancelar" (vuelve al paso anterior)
+SECCIÓN 3: PROCESAMIENTO
+Estados durante el procesamiento:
+--- Page 18 ---
+1. Procesando: Spinner + mensaje "Procesando tu pago..."
+2. Verificando: Spinner + mensaje "Verificando disponibilidad..."
+3. Confirmando: Spinner + mensaje "Confirmando tu reserva..."
+4. Éxito: Redirige al Paso 5
+5. Error: Mensaje de error + botón "Reintentar"
+Manejo de Errores:
+● Tarjeta declinada: "Tu tarjeta fue declinada. Por favor intenta con otra."
+● Sin disponibilidad: "Lo sentimos, acaban de reservar esa mesa. Por favor
+selecciona otro horario."
+● Error de pasarela: "Error al procesar el pago. Por favor intenta nuevamente."
+● Timeout: "La conexión tardó demasiado. Por favor verifica tu conexión e
+intenta de nuevo."
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// BookingSummary.tsx
+interface BookingSummaryProps {
+booking: BookingState;
+onEdit: (step: number) => void;
+}
+// PaymentForm.tsx
+interface PaymentFormProps {
+amount: number;
+currency: string;
+paymentMethods: string[];
+onPaymentSuccess: (paymentId: string) => void;
+onPaymentError: (error: string) => void;
+}
+// CreditCardInput.tsx
+interface CreditCardInputProps {
+cardNumber: string;
+expiryDate: string;
+cvv: string;
+cardHolder: string;
+onChange: (field: string, value: string) => void;
+errors: Record<string, string>;
+}
+--- Page 19 ---
+// ProcessingOverlay.tsx
+interface ProcessingOverlayProps {
+status: 'processing' | 'verifying' | 'confirming' |
+'success' | 'error';
+message: string;
+}
+Integración con Pasarelas de Pago:
+typescript
+// Wompi (Colombia)
+import { Wompi } from '@wompi/client';
+async function processWompiPayment(
+amount: number,
+cardToken: string,
+customerId: string
+): Promise<PaymentResult> {
+const response = await fetch('/api/payments/wompi', {
+method: 'POST',
+body: JSON.stringify({
+amount: amount * 100, // Wompi usa centavos
+currency: 'COP',
+cardToken,
+customerId,
+}),
+});
+return response.json();
+}
+// Stripe (Internacional)
+import { loadStripe } from '@stripe/stripe-js';
+async function processStripePayment(
+amount: number,
+cardElement: any,
+customerId: string
+): Promise<PaymentResult> {
+const stripe = await
+loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const { paymentMethod, error } = await
+stripe.createPaymentMethod({
+type: 'card',
+card: cardElement,
+--- Page 20 ---
+});
+if (error) throw error;
+const response = await fetch('/api/payments/stripe', {
+method: 'POST',
+body: JSON.stringify({
+amount,
+currency: 'cop',
+paymentMethodId: paymentMethod.id,
+customerId,
+}),
+});
+return response.json();
+}
+API Endpoints:
+typescript
+// POST /api/payments/create-intent
+Body: {
+amount: number,
+currency: string,
+paymentMethod: string,
+bookingData: any,
+}
+Response: {
+clientSecret: string, // para Stripe
+transactionId: string,
+}
+// POST /api/payments/confirm
+Body: {
+transactionId: string,
+paymentMethodId: string,
+}
+Response: {
+success: boolean,
+paymentId: string,
+error?: string,
+}
+// POST /api/bookings
+Body: {
+restaurantId: string,
+--- Page 21 ---
+branchId: string,
+partySize: number,
+eventType?: string,
+specialRequests?: string,
+date: string,
+time: string,
+customerId: string,
+paymentId?: string,
+}
+Response: {
+bookingId: string,
+confirmationCode: string,
+qrCode: string,
+}
+UI/UX:
+● Formateo automático de número de tarjeta (espacios cada 4 dígitos)
+● Detección automática de tipo de tarjeta (Visa, Mastercard, Amex)
+● Validación en tiempo real de campos de tarjeta
+● Máscara de CVV (3 o 4 dígitos según tipo de tarjeta)
+● Iconos de tarjetas aceptadas
+● Spinner de procesamiento con animación suave
+● Mensajes de error específicos (no genéricos)
+● Botón de pago deshabilitado mientras procesa
+● Accesibilidad: ARIA labels, keyboard navigation
+PASO 5: ÉXITO Y QR DE CONFIRMACIÓN
+REQUISITOS FUNCIONALES:
+Pantalla final de confirmación con el QR de la reserva.
+SECCIÓN 1: MENSAJE DE ÉXITO
+● Icono grande de checkmark verde (animado)
+● Mensaje: "¡Reserva confirmada!"
+● Subtítulo: "Te esperamos el [fecha] a las [hora]"
+● Código de confirmación: (ej: #RES-2026-001234)
+SECCIÓN 2: QR DE CONFIRMACIÓN
+● QR code grande y escaneable (min 200x200px)
+● Texto debajo: "Muestra este QR al llegar"
+● Botones de descarga:
+--- Page 22 ---
+○ "Guardar QR" (descarga PNG)
+○ "Enviar por email" (reenvía al email del cliente)
+○ "Agregar a Apple Wallet" (si es iOS)
+○ "Agregar a Google Pay" (si es Android)
+SECCIÓN 3: DETALLES DE LA RESERVA
+Card con resumen:
+● 📍 Restaurante: Nombre + Dirección + Link a Google Maps
+● 📅 Fecha y hora
+● 👥 Número de personas
+● 🎉 Tipo de evento (si aplica)
+● 👤 Nombre del cliente
+● 💳 Pago: "Depósito de $X pagado" o "Sin depósito"
+● 📋 Política de cancelación
+● 📞 Teléfono de contacto del restaurante
+SECCIÓN 4: ACCIONES ADICIONALES
+Botones:
+● "Agregar al calendario" (Google, Apple, Outlook)
+● "Compartir reserva" (WhatsApp, Email, SMS)
+● "Ver mis reservas" (si tiene cuenta)
+● "Volver al inicio"
+SECCIÓN 5: RECORDATORIOS
+Mensaje: "Te enviaremos un recordatorio por email y WhatsApp 24h y 2h antes de tu
+reserva"
+Checkbox: "No quiero recibir recordatorios" (opcional)
+SECCIÓN 6: FEEDBACK
+Mensaje: "¿Te fue útil el proceso de reserva?"
+● ⭐⭐⭐⭐⭐ (rating de 1-5)
+● Textarea opcional: "¿Algo que podamos mejorar?"
+● Botón: "Enviar feedback"
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// BookingConfirmation.tsx
+interface BookingConfirmationProps {
+booking: BookingState;
+qrCode: string;
+onDownloadQR: () => void;
+--- Page 23 ---
+onSendByEmail: () => void;
+onAddToCalendar: (provider: 'google' | 'apple' | 'outlook')
+=> void;
+}
+// QRCodeDisplay.tsx
+interface QRCodeDisplayProps {
+value: string;
+size?: number;
+logo?: string;
+}
+// CalendarButtons.tsx
+interface CalendarButtonsProps {
+booking: BookingState;
+onAddToGoogle: () => void;
+onAddToApple: () => void;
+onAddToOutlook: () => void;
+}
+// FeedbackForm.tsx
+interface FeedbackFormProps {
+onSubmit: (rating: number, comment?: string) => void;
+}
+Generación de QR:
+typescript
+import QRCode from 'qrcode.react';
+function BookingQR({ bookingId, size = 200 }: { bookingId:
+string; size?: number }) {
+const qrValue =
+`${process.env.NEXT_PUBLIC_APP_URL}/verify/${bookingId}`;
+return (
+<QRCode
+value={qrValue}
+size={size}
+level="H" // High error correction
+includeMargin={true}
+imageSettings={{
+src: '/logo.png',
+height: 40,
+width: 40,
+excavate: true,
+--- Page 24 ---
+}}
+/>
+);
+}
+Agregar al Calendario:
+typescript
+function generateGoogleCalendarUrl(booking: BookingState):
+string {
+const startDate = new
+Date(`${booking.selectedDate}T${booking.selectedTime}`);
+const endDate = new Date(startDate.getTime() +
+booking.restaurant.avgReservationTime * 60000);
+const params = new URLSearchParams({
+action: 'TEMPLATE',
+text: `Reserva en ${booking.restaurant.name}`,
+dates:
+`${formatDateForGoogle(startDate)}/${formatDateForGoogle(endDa
+te)}`,
+details: `Reserva para ${booking.partySize}
+personas\nCódigo: ${booking.bookingId}`,
+location: booking.branch.address,
+});
+return
+`https://calendar.google.com/calendar/render?${params.toString
+()}`;
+}
+function generateICSFile(booking: BookingState): string {
+// Generar archivo .ics para Apple/Outlook
+const ics = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${formatDateForICS(startDate)}
+DTEND:${formatDateForICS(endDate)}
+SUMMARY:Reserva en ${booking.restaurant.name}
+DESCRIPTION:Reserva para ${booking.partySize} personas
+LOCATION:${booking.branch.address}
+END:VEVENT
+END:VCALENDAR`;
+return ics;
+}
+--- Page 25 ---
+API Endpoints:
+typescript
+// POST /api/bookings/{id}/send-email
+Body: { email: string }
+Response: { success: boolean }
+// POST /api/bookings/{id}/feedback
+Body: { rating: number, comment?: string }
+Response: { success: boolean }
+// GET /api/bookings/{id}/qr
+Response: { qrCode: string } // base64
+UI/UX:
+● Animación de confetti al mostrar la confirmación (opcional, sutil)
+● QR con animación de "draw" (se dibuja progresivamente)
+● Botones de descarga con iconos claros
+● Mensaje de éxito con tono celebratorio
+● Feedback form con estrellas interactivas
+● Accesibilidad: ARIA labels, keyboard navigation
+INTEGRACIÓN COMPLETA CON CAL.COM
+CONFIGURACIÓN DE CAL.COM:
+Event Types necesarios:
+typescript
+// Crear un Event Type por cada tipo de reserva
+const eventTypes = [
+{
+title: "Reserva Estándar",
+slug: "reserva-estandar",
+length: 90, // minutos
+locations: [{ type: "integrations:zoom" }], // o
+"inPerson"
+schedulingType: "ROUND_ROBIN",
+hosts: [], // se asignan dinámicamente
+},
+{
+title: "Reserva con Depósito",
+slug: "reserva-con-deposito",
+length: 90,
+--- Page 26 ---
+requiresConfirmation: true,
+metadata: {
+requireDeposit: true,
+depositPercentage: 50,
+},
+},
+// ... más tipos
+];
+Flujo de Creación de Reserva en Cal.com:
+typescript
+async function createCalComBooking(bookingData: BookingState):
+Promise<string> {
+const response = await
+fetch(`${CALCOM_API_URL}/api/v2/bookings`, {
+method: 'POST',
+headers: {
+'Authorization': `Bearer ${CALCOM_API_KEY}`,
+'Content-Type': 'application/json',
+},
+body: JSON.stringify({
+eventTypeId: getEventTypeId(bookingData),
+start:
+`${bookingData.selectedDate}T${bookingData.selectedTime}:00Z`,
+end: calculateEndTime(bookingData),
+responses: {
+name: bookingData.customer.name,
+email: bookingData.customer.email,
+phone: bookingData.customer.phone,
+partySize: bookingData.partySize,
+eventType: bookingData.eventType,
+specialRequests: bookingData.specialRequests,
+},
+metadata: {
+bookingSource: 'web',
+restaurantId: bookingData.restaurant.id,
+branchId: bookingData.branch.id,
+paymentId: bookingData.paymentId,
+},
+language: 'es',
+timeZone: bookingData.branch.timezone,
+}),
+});
+if (!response.ok) {
+--- Page 27 ---
+const error = await response.json();
+throw new Error(error.message || 'Failed to create
+booking');
+}
+const result = await response.json();
+return result.id;
+}
+Webhooks de Cal.com:
+typescript
+// Escuchar eventos de Cal.com
+// POST /api/webhooks/calcom
+export default async function handler(req: NextApiRequest,
+res: NextApiResponse) {
+const { event, payload } = req.body;
+switch (event) {
+case 'BOOKING_CREATED':
+// Enviar email de confirmación
+await sendConfirmationEmail(payload);
+// Enviar WhatsApp de confirmación
+await sendWhatsAppConfirmation(payload);
+// Actualizar estado en base de datos
+await updateBookingStatus(payload.id, 'confirmed');
+break;
+case 'BOOKING_CANCELLED':
+// Procesar reembolso si aplica
+if (payload.paymentId) {
+await processRefund(payload.paymentId);
+}
+// Enviar notificación de cancelación
+await sendCancellationNotification(payload);
+break;
+case 'BOOKING_RESCHEDULED':
+// Enviar notificación de reprogramación
+await sendRescheduleNotification(payload);
+break;
+}
+res.status(200).json({ received: true });
+}
+--- Page 28 ---
+MANEJO DE ERRORES Y ESTADOS
+ESTADOS DE CARGA:
+typescript
+// Skeleton loaders para cada paso
+<StepOneSkeleton />
+<DateTimeSelectorSkeleton />
+<CustomerFormSkeleton />
+<PaymentFormSkeleton />
+MANEJO DE ERRORES:
+typescript
+// Error boundary global
+class BookingErrorBoundary extends React.Component {
+state = { hasError: false, error: null };
+static getDerivedStateFromError(error: Error) {
+return { hasError: true, error };
+}
+render() {
+if (this.state.hasError) {
+return <ErrorFallback error={this.state.error} />;
+}
+return this.props.children;
+}
+}
+// Error fallback component
+function ErrorFallback({ error }: { error: Error }) {
+return (
+<div className="error-container">
+<h2>Algo salió mal</h2>
+<p>{error.message}</p>
+<button onClick={() => window.location.reload()}>
+Intentar de nuevo
+</button>
+</div>
+);
+}
+VALIDACIONES DE DISPONIBILIDAD EN TIEMPO REAL:
+typescript
+--- Page 29 ---
+// Verificar disponibilidad antes de confirmar
+async function verifyAvailability(bookingData: BookingState):
+Promise<boolean> {
+const response = await fetch(
+`/api/restaurants/${bookingData.restaurant.id}/branches/${book
+ingData.branch.id}/verify-availability`,
+{
+method: 'POST',
+body: JSON.stringify({
+date: bookingData.selectedDate,
+time: bookingData.selectedTime,
+partySize: bookingData.partySize,
+}),
+}
+);
+const result = await response.json();
+return result.available;
+}
+ACCESIBILIDAD (WCAG 2.1 AA)
+REQUISITOS:
+● Todos los inputs tienen labels asociados
+● Navegación completa por teclado (Tab, Enter, Escape)
+● Focus visible en todos los elementos interactivos
+● Contraste de colores mínimo 4.5:1 (texto normal)
+● Textos alternativos en imágenes y iconos
+● ARIA labels en botones sin texto
+● Anuncios de errores en tiempo real (aria-live)
+● Tamaño de fuente ajustable (hasta 200%)
+● Soporte para lectores de pantalla (VoiceOver, NVDA, JAWS)
+IMPLEMENTACIÓN:
+typescript
+// Ejemplo de input accesible
+<label htmlFor="customer-name" className="sr-only">
+Nombre completo
+</label>
+<input
+id="customer-name"
+--- Page 30 ---
+type="text"
+aria-required="true"
+aria-invalid={errors.name ? "true" : "false"}
+aria-describedby={errors.name ? "name-error" : undefined}
+className={cn(
+"input-field",
+errors.name && "border-red-500"
+)}
+/>
+{errors.name && (
+<p id="name-error" className="error-message" role="alert">
+{errors.name}
+</p>
+)}
+RESPONSIVE DESIGN (MOBILE-FIRST)
+BREAKPOINTS:
+css
+/* Mobile first */
+@media (min-width: 640px) {
+/* Tablet */
+}
+@media (min-width: 768px) {
+/* Desktop pequeño */
+}
+@media (min-width: 1024px) {
+/* Desktop */
+}
+@media (min-width: 1280px) {
+/* Desktop grande */
+}
+ADAPTACIONES POR DISPOSITIVO:
+Móvil:
+● Una columna
+● Botones grandes (min 44x44px)
+● Navegación por gestos (swipe para cambiar de paso)
+--- Page 31 ---
+● Teclado numérico para campos de número
+● Bottom sheet para modales
+Tablet:
+● Dos columnas donde aplique
+● Grid de time slots más amplio
+● Preview lateral del resumen
+Desktop:
+● Layout de dos columnas (configuración + preview)
+● Hover effects
+● Tooltips en lugar de texto explicativo inline
+● Atajos de teclado (Ctrl+Enter para continuar)
+OPTIMIZACIÓN DE RENDIMIENTO
+CODE SPLITTING:
+typescript
+// Lazy load de componentes pesados
+const DateTimeSelector = dynamic(() =>
+import('./DateTimeSelector'), {
+loading: () => <DateTimeSelectorSkeleton />,
+});
+const PaymentForm = dynamic(() => import('./PaymentForm'), {
+loading: () => <PaymentFormSkeleton />,
+});
+IMAGE OPTIMIZATION:
+typescript
+import Image from 'next/image';
+<Image
+src={branch.photoUrl}
+alt={branch.name}
+width={400}
+height={300}
+loading="lazy"
+placeholder="blur"
+--- Page 32 ---
+blurDataURL={branch.photoBlurHash}
+/>
+API OPTIMIZATION:
+typescript
+// SWR para caché de disponibilidad
+import useSWR from 'swr';
+function useAvailability(branchId: string, date: string) {
+const { data, error, isLoading } = useSWR(
+`/api/branches/${branchId}/availability?date=${date}`,
+fetcher,
+{
+revalidateOnFocus: false,
+dedupingInterval: 60000, // 1 minuto
+}
+);
+return { data, error, isLoading };
+}
+TESTING
+TESTS UNITARIOS:
+// tests/PartySizeSelector.test.tsx
+describe('PartySizeSelector', () => {
+it('debe mostrar botones del 1 al 8', () => {
+render(<PartySizeSelector value={1} onChange={() => {}}
+maxCapacity={50} />);
+expect(screen.getByText('1')).toBeInTheDocument();
+expect(screen.getByText('8')).toBeInTheDocument();
+});
+it('debe llamar onChange al hacer click en un número', () =>
+{
+const onChange = jest.fn();
+render(<PartySizeSelector value={1} onChange={onChange}
+maxCapacity={50} />);
+fireEvent.click(screen.getByText('4'));
+expect(onChange).toHaveBeenCalledWith(4);
+});
+--- Page 33 ---
+it('no debe permitir seleccionar más que la capacidad
+máxima', () => {
+render(<PartySizeSelector value={1} onChange={() => {}}
+maxCapacity={5} />);
+expect(screen.queryByText('6')).not.toBeInTheDocument();
+});
+});
+TESTS DE INTEGRACIÓN:
+typescript
+// tests/BookingFlow.test.tsx
+describe('Flujo completo de reserva', () => {
+it('debe completar una reserva exitosamente', async () => {
+render(<BookingPage />);
+// Paso 1: Seleccionar número de personas
+fireEvent.click(screen.getByText('4'));
+fireEvent.click(screen.getByText('Siguiente'));
+// Paso 2: Seleccionar fecha y hora
+fireEvent.click(screen.getByText('15'));
+fireEvent.click(screen.getByText('20:00'));
+fireEvent.click(screen.getByText('Siguiente'));
+// Paso 3: Datos del cliente
+fireEvent.change(screen.getByLabelText('Nombre'), {
+target: { value: 'Juan Pérez' } });
+fireEvent.change(screen.getByLabelText('Email'), { target:
+{ value: 'juan@email.com' } });
+fireEvent.change(screen.getByLabelText('Teléfono'), {
+target: { value: '+573001234567' } });
+fireEvent.click(screen.getByText('Siguiente'));
+// Paso 4: Confirmar
+fireEvent.click(screen.getByText('Confirmar reserva'));
+// Paso 5: Ver confirmación
+await waitFor(() => {
+expect(screen.getByText('¡Reserva
+confirmada!')).toBeInTheDocument();
+});
+});
+});
+--- Page 34 ---
+TESTS E2E (Playwright):
+typescript
+// e2e/booking.spec.ts
+import { test, expect } from '@playwright/test';
+test('flujo completo de reserva', async ({ page }) => {
+await page.goto('/reservar');
+// Seleccionar sede
+await page.click('[data-testid="branch-card-1"]');
+// Seleccionar número de personas
+await page.click('text=4');
+await page.click('text=Siguiente');
+// Seleccionar fecha y hora
+await page.click('[data-testid="date-15"]');
+await page.click('text=20:00');
+await page.click('text=Siguiente');
+// Completar datos
+await page.fill('[name="name"]', 'Juan Pérez');
+await page.fill('[name="email"]', 'juan@email.com');
+await page.fill('[name="phone"]', '+573001234567');
+await page.click('text=Siguiente');
+// Confirmar
+await page.click('text=Confirmar reserva');
+// Verificar confirmación
+await expect(page.locator('text=¡Reserva
+confirmada!')).toBeVisible();
+});
+RESUMEN DE ENTREGABLES ESPERADOS
+Después de implementar este módulo, debes tener:
+✅ Frontend:
+● Flujo completo de 5 pasos funcional
+● Selección de sede con geolocalización
+● Calendario con indicadores de disponibilidad
+● Grid de time slots con filtros
+--- Page 35 ---
+● Formulario de cliente (guest-first)
+● Integración con pasarelas de pago
+● Generación de QR de confirmación
+● Descarga de QR y agregar a calendario
+● Sistema de feedback
+✅ Backend:
+● API REST completa para reservas
+● Integración con Cal.com
+● Webhooks para eventos de reservas
+● Validación de disponibilidad en tiempo real
+● Procesamiento de pagos seguro
+● Generación de QRs
+● Envío de emails y notificaciones
+✅ UX/UI:
+● Diseño responsive (mobile-first)
+● Animaciones suaves entre pasos
+● Loading states y skeleton loaders
+● Error handling robusto
+● Accesibilidad WCAG 2.1 AA
+● Optimización de rendimiento
+✅ Testing:
+● Tests unitarios de componentes
+● Tests de integración de flujos
+● Tests E2E con Playwright
+● Tests de accesibilidad
+INSTRUCCIONES PARA ANTIGRAVITY
+1. Comienza con el estado global (Zustand store)
+2. Implementa el routing entre pasos (React Router o Next.js App Router)
+3. Desarrolla paso por paso (Paso 0 → Paso 5)
+4. Integra con Cal.com para disponibilidad y creación de reservas
+5. Agrega las pasarelas de pago según configuración del restaurante
+6. Implementa la generación de QR y descargas
+7. Asegura la calidad (tests, validaciones, error handling)
+8. Optimiza el rendimiento (code splitting, lazy loading, caché)
+--- Page 36 ---
+Prioridad:
+1. Flujo básico (sin pago)
+2. Calendario y time slots
+3. Formulario de cliente
+4. Integración con Cal.com
+5. Pasarelas de pago
+6. QR y confirmación
+7. Características avanzadas (geolocalización, feedback, etc.)
+Nota: Cada paso debe ser funcional independientemente, pero integrarse
+perfectamente con los demás. El flujo debe ser fluido y sin fricciones.
+
+================================================================================
+FILE: agendamiento modulo 3.pdf
+================================================================================
+
+--- Page 1 ---
+PROMPT TÉCNICO PARA ANTIGRAVITY - MÓDULO 3:
+DASHBOARD DEL RESTAURANTE
+markdown
+# CONTEXTO DEL MÓDULO 3
+Estás construyendo el DASHBOARD DE ADMINISTRACIÓN para
+restaurantes.
+Este es el panel interno donde el restaurante gestiona
+reservas, mesas, clientes y ve analytics.
+Debe ser rápido, intuitivo y funcional para uso diario durante
+el servicio.
+STACK TECNOLÓGICO:
+- Frontend: Next.js 14+ (App Router), TypeScript, TailwindCSS
+- UI Components: shadcn/ui, Radix UI
+- Calendar: react-day-picker + date-fns
+- Tables: @tanstack/react-table (tablas avanzadas)
+- Charts: recharts o chart.js (gráficos)
+- Drag & Drop: @dnd-kit/core (para mesas)
+- Forms: React Hook Form + Zod validation
+- State Management: Zustand (estado global del dashboard)
+- Real-time: Socket.io o Pusher (actualizaciones en tiempo
+real)
+- Export: xlsx (Excel), jsPDF + jspdf-autotable (PDF)
+- Date handling: date-fns
+- Icons: lucide-react
+- Notifications: react-hot-toast
+---
+## ARQUITECTURA DEL DASHBOARD
+**ESTRUCTURA DE NAVEGACIÓN:**
+Sidebar (Lateral izquierdo):
+├── 🏠 Inicio (Overview)
+├── 📅 Reservas
+│ ├── Calendario
+│ ├── Lista
+│ └── Mesas (Floor Plan)
+├── 👥 Clientes (CRM)
+├── 📊 Analytics
+--- Page 2 ---
+├── 💬 Mensajes (Agentes IA)
+├── ⚙ Configuración
+│ ├── Restaurante
+│ ├── Sucursales
+│ ├── Horarios
+│ ├── Mesas
+│ ├── Pagos
+│ ├── Personal
+│ └── Integraciones
+└── 🔔 Notificaciones
+**ROLES Y PERMISOS:**
+```typescript
+enum Role {
+OWNER = 'owner', // Dueño - acceso total
+MANAGER = 'manager', // Gerente - acceso casi total
+HOSTESS = 'hostess', // Hostess - solo reservas y mesas
+WAITER = 'waiter', // Mesero - solo ver reservas asignadas
+VIEWER = 'viewer', // Solo lectura
+}
+interface Permissions {
+viewReservations: boolean;
+createReservations: boolean;
+editReservations: boolean;
+deleteReservations: boolean;
+viewCustomers: boolean;
+editCustomers: boolean;
+viewAnalytics: boolean;
+exportData: boolean;
+manageSettings: boolean;
+manageStaff: boolean;
+managePayments: boolean;
+}
+const rolePermissions: Record<Role, Permissions> = {
+[Role.OWNER]: { /* todo true */ },
+[Role.MANAGER]: { /* casi todo true */ },
+[Role.HOSTESS]: {
+viewReservations: true,
+createReservations: true,
+editReservations: true,
+--- Page 3 ---
+deleteReservations: true,
+viewCustomers: true,
+editCustomers: false,
+viewAnalytics: false,
+exportData: false,
+manageSettings: false,
+manageStaff: false,
+managePayments: false,
+},
+// ... más roles
+};
+ESTADO GLOBAL (Zustand Store):
+typescript
+interface DashboardState {
+// Filtros globales
+selectedBranch: Branch | null;
+selectedDate: Date;
+dateRange: { start: Date; end: Date };
+// Datos en tiempo real
+todayReservations: Booking[];
+activeTables: Table[];
+walkIns: WalkIn[];
+// UI State
+sidebarCollapsed: boolean;
+activeView: 'calendar' | 'list' | 'floor-plan';
+selectedBooking: Booking | null;
+isRealtimeConnected: boolean;
+// Actions
+setSelectedBranch: (branch: Branch) => void;
+setSelectedDate: (date: Date) => void;
+refreshData: () => void;
+// ... más actions
+}
+SECCIÓN 1: OVERVIEW (INICIO)
+REQUISITOS FUNCIONALES:
+Pantalla principal con métricas clave del día en tiempo real.
+CARDS DE MÉTRICAS (Top):
+4 cards principales con KPIs del día:
+--- Page 4 ---
+1. Reservas Hoy
+○ Número total de reservas del día
+○ Comparación con ayer (↑↓ %)
+○ Icono: 📅
+○ Color: Azul
+2. Ocupación Actual
+○ Porcentaje de mesas ocupadas ahora
+○ Mesas ocupadas / Total mesas
+○ Icono: 🪑
+○ Color: Verde (si <80%), Amarillo (80-95%), Rojo (>95%)
+3. Comensales Esperados
+○ Total de personas que han reservado hoy
+○ Promedio por reserva
+○ Icono: 👥
+○ Color: Púrpura
+4. No-Shows Hoy
+○ Número de no-shows del día
+○ Tasa de no-show (%)
+○ Icono: ⚠
+○ Color: Rojo si >10%, Verde si <5%
+GRÁFICO DE OCUPACIÓN POR HORA:
+● Gráfico de líneas/barras mostrando ocupación esperada por hora
+● Eje X: Horas del día (12:00 - 23:00)
+● Eje Y: Número de reservas o porcentaje de ocupación
+● Línea de capacidad máxima (línea roja punteada)
+● Barras de reservas confirmadas
+● Barras de check-ins realizados
+● Hover: muestra detalles de esa hora
+LISTA DE PRÓXIMAS RESERVAS:
+● Lista de las próximas 10 reservas (ordenadas por hora)
+● Cada item muestra:
+○ Hora
+○ Nombre del cliente
+○ Número de personas
+○ Mesa asignada (si ya está asignada)
+○ Estado: Confirmada / Pendiente / Check-in
+○ Origen: Web / WhatsApp / Llamada / Walk-in
+● Click en reserva → abre modal de detalles
+● Botón "Check-in rápido" (marca como llegado)
+● Botón "Llamar cliente" (abre tel: link)
+--- Page 5 ---
+ALERTAS Y NOTIFICACIONES:
+Panel lateral derecho con alertas en tiempo real:
+● 🔴 Urgente: "Mesa 5 lleva 2h 30m (tiempo excedido)"
+● 🟡 Advertencia: "3 reservas pendientes de confirmación"
+● 🟢 Info: "Juan Pérez acaba de hacer check-in"
+● 🔵 Sistema: "Nueva reserva por WhatsApp para mañana"
+Cada alerta tiene:
+● Icono de prioridad
+● Timestamp
+● Botón de acción (Ver, Marcar como leída, Resolver)
+WIDGET DE CLIMA:
+● Clima actual de la ciudad del restaurante
+● Pronóstico para las próximas horas
+● Impacto esperado en reservas (ej: "Lluvia = +15% reservas")
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// DashboardOverview.tsx
+interface DashboardOverviewProps {
+restaurantId: string;
+branchId: string;
+}
+// MetricCard.tsx
+interface MetricCardProps {
+title: string;
+value: number | string;
+icon: React.ReactNode;
+trend?: {
+value: number;
+isPositive: boolean;
+};
+color: 'blue' | 'green' | 'yellow' | 'red' | 'purple';
+}
+// OccupancyChart.tsx
+interface OccupancyChartProps {
+data: Array<{
+hour: string;
+--- Page 6 ---
+expected: number;
+actual: number;
+capacity: number;
+}>;
+}
+// UpcomingReservationsList.tsx
+interface UpcomingReservationsListProps {
+reservations: Booking[];
+onCheckIn: (bookingId: string) => void;
+onViewDetails: (booking: Booking) => void;
+}
+// AlertsPanel.tsx
+interface AlertsPanelProps {
+alerts: Alert[];
+onDismiss: (alertId: string) => void;
+onAction: (alertId: string, action: string) => void;
+}
+API Endpoints:
+typescript
+// GET /api/dashboard/overview
+Query params:
+- restaurantId: string
+- branchId: string
+- date: YYYY-MM-DD
+Response: {
+metrics: {
+totalReservations: number,
+yesterdayReservations: number,
+currentOccupancy: number,
+totalTables: number,
+occupiedTables: number,
+expectedGuests: number,
+avgPartySize: number,
+noShows: number,
+noShowRate: number,
+},
+hourlyData: Array<{
+hour: string,
+expected: number,
+actual: number,
+capacity: number,
+--- Page 7 ---
+}>,
+upcomingReservations: Booking[],
+alerts: Alert[],
+}
+// GET /api/dashboard/realtime
+WebSocket endpoint para actualizaciones en tiempo real
+Real-time Updates (Socket.io):
+typescript
+// server/socket.ts
+import { Server } from 'socket.io';
+const io = new Server(httpServer, {
+cors: {
+origin: process.env.NEXT_PUBLIC_APP_URL,
+},
+});
+io.on('connection', (socket) => {
+// Unirse a la sala del restaurante
+socket.on('join-restaurant', (restaurantId: string) => {
+socket.join(`restaurant-${restaurantId}`);
+});
+// Escuchar eventos de reservas
+socket.on('booking-created', (booking: Booking) => {
+io.to(`restaurant-${booking.restaurantId}`).emit('new-booking'
+, booking);
+});
+socket.on('booking-checked-in', (bookingId: string) => {
+io.to(`restaurant-${restaurantId}`).emit('check-in',
+bookingId);
+});
+// ... más eventos
+});
+// client/hooks/useRealtime.ts
+import { useEffect } from 'react';
+import { io, Socket } from 'socket.io-client';
+export function useRealtime(restaurantId: string) {
+--- Page 8 ---
+useEffect(() => {
+const socket: Socket =
+io(process.env.NEXT_PUBLIC_WS_URL!);
+socket.emit('join-restaurant', restaurantId);
+socket.on('new-booking', (booking: Booking) => {
+// Actualizar estado local
+toast.success(`Nueva reserva de
+${booking.customer.name}`);
+});
+socket.on('check-in', (bookingId: string) => {
+// Actualizar estado local
+});
+return () => {
+socket.disconnect();
+};
+}, [restaurantId]);
+}
+UI/UX:
+● Auto-refresh cada 30 segundos (o real-time con WebSockets)
+● Skeleton loaders mientras cargan las métricas
+● Animaciones suaves al actualizar números (count up/down)
+● Tooltips en cada métrica explicando qué significa
+● Click en card → navega a vista detallada
+● Responsive: cards en grid 2x2 en móvil, 4x1 en desktop
+● Dark mode support
+SECCIÓN 2: GESTIÓN DE RESERVAS
+VISTA 2.1: CALENDARIO
+REQUISITOS FUNCIONALES:
+Vista de calendario con las reservas del día/semana/mes.
+MODOS DE VISTA:
+1. Vista Día:
+○ Timeline vertical de 24 horas (o solo horas de apertura)
+○ Cada hora dividida en slots de 15/30 min
+○ Reservas mostradas como bloques de color
+--- Page 9 ---
+○ Altura del bloque proporcional a la duración
+○ Color según estado:
+■ Verde: Confirmada
+■ Amarillo: Pendiente
+■ Rojo: No-show
+■ Gris: Cancelada
+○ Click en reserva → modal de detalles
+○ Drag & drop para mover reservas (cambia hora)
+○ Click en espacio vacío → crear nueva reserva
+2. Vista Semana:
+○ 7 columnas (Lun-Dom)
+○ Timeline vertical de horas
+○ Reservas como bloques pequeños
+○ Hover → tooltip con detalles
+○ Click → modal de detalles
+3. Vista Mes:
+○ Calendario tradicional (grid de días)
+○ Cada día muestra número de reservas
+○ Código de colores por nivel de ocupación
+○ Click en día → cambia a vista día
+FILTROS:
+● Selector de sucursal (si hay varias)
+● Selector de fecha (día/semana/mes)
+● Filtro por estado (Confirmadas, Pendientes, No-shows, Canceladas)
+● Filtro por origen (Web, WhatsApp, Llamada, Walk-in)
+● Filtro por tamaño de grupo (1-2, 3-4, 5-6, 7+)
+● Búsqueda por nombre o teléfono del cliente
+ACCIONES RÁPIDAS:
+● Botón "+ Nueva reserva" (abre modal)
+● Botón "Exportar" (Excel/PDF)
+● Botón "Imprimir" (vista optimizada para impresión)
+● Botón "Compartir" (link público del calendario)
+MODAL DE DETALLES DE RESERVA:
+Al hacer click en una reserva, se abre un modal con:
+Header:
+● Nombre del cliente
+● Estado actual (badge de color)
+● Botones de acción rápida:
+○ ✅ Check-in
+--- Page 10 ---
+○ 📞 Llamar
+○ ✉ Email
+○ 💬 WhatsApp
+○ ✏ Editar
+○ ❌ Cancelar
+Información de la Reserva:
+● 📅 Fecha y hora
+● ⏱ Duración estimada
+● 👥 Número de personas
+● 🎉 Tipo de evento
+● 📝 Solicitudes especiales
+● 🪑 Mesa asignada (o "Sin asignar")
+● 📍 Origen de la reserva
+Información del Cliente:
+● Nombre completo
+● Email (con link mailto:)
+● Teléfono (con link tel:)
+● Historial: "Ha venido X veces" / "Primera vez"
+● Notas internas del restaurante
+● Rating del cliente (1-5 estrellas)
+Timeline de Eventos:
+● Lista cronológica de eventos:
+○ "Reserva creada por Web - 15/03 10:30"
+○ "Email de confirmación enviado - 15/03 10:31"
+○ "Recordatorio enviado por WhatsApp - 17/03 18:00"
+○ "Check-in realizado - 17/03 20:05"
+Pagos (si aplica):
+● Monto del depósito
+● Estado del pago (Pagado / Pendiente / Reembolsado)
+● Método de pago
+● Link a transacción en pasarela
+Notas Internas:
+● Textarea para agregar notas privadas (no visibles al cliente)
+● Historial de notas con timestamp y autor
+Acciones:
+--- Page 11 ---
+● Check-in: Marca al cliente como llegado, asigna mesa si no está asignada
+● No-show: Marca como no-show, aplica penalización si está configurada
+● Editar: Cambia fecha/hora/número de personas/mesa
+● Mover a otra mesa: Drag & drop o selector
+● Extender tiempo: Agrega 30min/1h/1h30m
+● Dividir cuenta: (si el POS lo soporta)
+● Agregar al CRM: Guarda preferencias del cliente
+● Enviar mensaje: WhatsApp/Email/SMS personalizado
+● Cancelar: Con opción de reembolso automático
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// ReservationsCalendar.tsx
+interface ReservationsCalendarProps {
+restaurantId: string;
+branchId: string;
+viewMode: 'day' | 'week' | 'month';
+onViewModeChange: (mode: 'day' | 'week' | 'month') => void;
+}
+// DayView.tsx
+interface DayViewProps {
+date: Date;
+reservations: Booking[];
+onReservationClick: (booking: Booking) => void;
+onTimeSlotClick: (time: string) => void;
+onReservationDrop: (bookingId: string, newTime: string) =>
+void;
+}
+// WeekView.tsx
+interface WeekViewProps {
+startDate: Date;
+reservations: Booking[];
+onReservationClick: (booking: Booking) => void;
+}
+// MonthView.tsx
+interface MonthViewProps {
+month: Date;
+reservationsByDay: Record<string, Booking[]>;
+onDayClick: (date: Date) => void;
+}
+--- Page 12 ---
+// ReservationModal.tsx
+interface ReservationModalProps {
+booking: Booking | null;
+isOpen: boolean;
+onClose: () => void;
+onCheckIn: (bookingId: string) => void;
+onNoShow: (bookingId: string) => void;
+onEdit: (booking: Booking) => void;
+onCancel: (bookingId: string, reason: string) => void;
+}
+// ReservationFilters.tsx
+interface ReservationFiltersProps {
+filters: ReservationFilters;
+onFilterChange: (filters: ReservationFilters) => void;
+}
+API Endpoints:
+typescript
+// GET /api/reservations
+Query params:
+- restaurantId: string
+- branchId?: string
+- startDate: YYYY-MM-DD
+- endDate: YYYY-MM-DD
+- status?: string[]
+- source?: string[]
+- partySize?: string
+- search?: string
+Response: {
+reservations: Booking[],
+total: number,
+page: number,
+pageSize: number,
+}
+// POST /api/reservations
+Body: {
+restaurantId: string,
+branchId: string,
+date: string,
+time: string,
+partySize: number,
+--- Page 13 ---
+customer: {
+name: string,
+email: string,
+phone: string,
+},
+eventType?: string,
+specialRequests?: string,
+tableId?: string,
+notes?: string,
+}
+Response: {
+bookingId: string,
+}
+// PUT /api/reservations/{id}
+Body: {
+date?: string,
+time?: string,
+partySize?: number,
+tableId?: string,
+status?: string,
+notes?: string,
+}
+// POST /api/reservations/{id}/check-in
+Response: {
+success: boolean,
+checkedInAt: string,
+}
+// POST /api/reservations/{id}/no-show
+Response: {
+success: boolean,
+penaltyApplied: boolean,
+penaltyAmount?: number,
+}
+// DELETE /api/reservations/{id}
+Body: {
+reason: string,
+refund: boolean,
+}
+Drag & Drop (Calendario):
+typescript
+--- Page 14 ---
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
+function DayView({ reservations, onReservationDrop }) {
+const handleDragEnd = (event: DragEndEvent) => {
+const { active, over } = event;
+if (!over) return;
+const bookingId = active.id as string;
+const newTimeSlot = over.id as string; // ej: "14:30"
+onReservationDrop(bookingId, newTimeSlot);
+};
+return (
+<DndContext onDragEnd={handleDragEnd}>
+{/* Timeline con slots */}
+{reservations.map(booking => (
+<DraggableReservation key={booking.id}
+booking={booking} />
+))}
+</DndContext>
+);
+}
+UI/UX:
+● Timeline con líneas de hora cada 30 min
+● Reservas con bordes redondeados y sombras sutiles
+● Hover en reserva → elevación y sombra más pronunciada
+● Drag preview semi-transparente
+● Snap to grid al arrastrar (cada 15 min)
+● Animación de transición al mover reservas
+● Color coding consistente en todas las vistas
+● Tooltips con información clave al hacer hover
+● Responsive: vista día en móvil, semana/mes en desktop
+● Accesibilidad: keyboard navigation, ARIA labels
+VISTA 2.2: LISTA
+REQUISITOS FUNCIONALES:
+Vista de tabla con todas las reservas, ideal para búsqueda y filtrado avanzado.
+COLUMNS DE LA TABLA:
+--- Page 15 ---
+Columna Contenido Ancho Ordenable Filtrable
+Estado Badge de 100px ✓ ✓
+color
+(Confirmada,
+Pendiente,
+etc.)
+Fecha DD/MM/YYYY 120px ✓ ✓
+Hora HH:mm 80px ✓ ✗
+Cliente Nombre + 200px ✓ ✓
+Teléfono
+Personas Número + 100px ✓ ✓
+Icono
+Mesa Número de 100px ✗ ✗
+mesa o "Sin
+asignar"
+Origen Icono (Web, 100px ✗ ✓
+WhatsApp,
+Llamada, etc.)
+Duración Tiempo 100px ✗ ✗
+estimado
+Depósito Monto pagado 120px ✗ ✗
+o "Sin
+depósito"
+Acciones Botones (Ver, 150px ✗ ✗
+Editar,
+Check-in)
+FUNCIONALIDADES DE LA TABLA:
+● Ordenamiento: Click en header de columna para ordenar ASC/DESC
+● Filtrado: Filtros avanzados arriba de la tabla
+● Búsqueda: Input de búsqueda global (nombre, teléfono, email)
+● Paginación: 20/50/100 registros por página
+● Selección múltiple: Checkboxes para acciones masivas
+● Acciones masivas:
+--- Page 16 ---
+○ Enviar recordatorio a todos
+○ Exportar selección
+○ Cancelar selección
+○ Asignar mesa a selección
+● Row actions: Click derecho en fila → menú contextual
+● Inline editing: Doble click en celda editable → edita inline
+● Expandible: Click en fila → expande para ver más detalles
+● Sticky header: Header se mantiene visible al hacer scroll
+● Sticky actions: Columna de acciones siempre visible
+ESTADOS DE FILA:
+● Fila normal: Fondo blanco
+● Fila hover: Fondo gris claro
+● Fila seleccionada: Fondo azul claro
+● Fila de reserva pasada: Opacidad 50%
+● Fila de no-show: Fondo rojo claro
+● Fila de reserva urgente (próximos 30 min): Borde izquierdo naranja
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// ReservationsList.tsx
+interface ReservationsListProps {
+restaurantId: string;
+branchId: string;
+}
+// ReservationsTable.tsx
+interface ReservationsTableProps {
+reservations: Booking[];
+columns: ColumnDef<Booking>[];
+onRowClick: (booking: Booking) => void;
+onBulkAction: (action: string, bookingIds: string[]) =>
+void;
+}
+// ReservationsFilters.tsx
+interface ReservationsFiltersProps {
+filters: ReservationFilters;
+onFilterChange: (filters: ReservationFilters) => void;
+onClearFilters: () => void;
+}
+--- Page 17 ---
+// BulkActionsBar.tsx
+interface BulkActionsBarProps {
+selectedCount: number;
+onAction: (action: string) => void;
+onClearSelection: () => void;
+}
+@tanstack/react-table Setup:
+typescript
+import {
+useReactTable,
+getCoreRowModel,
+getSortedRowModel,
+getFilteredRowModel,
+getPaginationRowModel,
+ColumnDef,
+flexRender,
+} from '@tanstack/react-table';
+const columns: ColumnDef<Booking>[] = [
+{
+id: 'select',
+header: ({ table }) => (
+<Checkbox
+checked={table.getIsAllPageRowsSelected()}
+onCheckedChange={(value) =>
+table.toggleAllPageRowsSelected(!!value)
+}
+/>
+),
+cell: ({ row }) => (
+<Checkbox
+checked={row.getIsSelected()}
+onCheckedChange={(value) =>
+row.toggleSelected(!!value)}
+/>
+),
+},
+{
+accessorKey: 'status',
+header: 'Estado',
+cell: ({ row }) => {
+const status = row.original.status;
+return <StatusBadge status={status} />;
+--- Page 18 ---
+},
+},
+{
+accessorKey: 'date',
+header: 'Fecha',
+cell: ({ row }) => {
+return format(new Date(row.original.date),
+'dd/MM/yyyy');
+},
+},
+{
+accessorKey: 'time',
+header: 'Hora',
+},
+{
+accessorKey: 'customer.name',
+header: 'Cliente',
+cell: ({ row }) => {
+const { name, phone } = row.original.customer;
+return (
+<div>
+<div className="font-medium">{name}</div>
+<div className="text-sm text-gray-500">{phone}</div>
+</div>
+);
+},
+},
+{
+accessorKey: 'partySize',
+header: 'Personas',
+cell: ({ row }) => {
+return (
+<div className="flex items-center gap-1">
+<UsersIcon className="w-4 h-4" />
+{row.original.partySize}
+</div>
+);
+},
+},
+// ... más columnas
+];
+function ReservationsTable({ reservations }) {
+const table = useReactTable({
+--- Page 19 ---
+data: reservations,
+columns,
+getCoreRowModel: getCoreRowModel(),
+getSortedRowModel: getSortedRowModel(),
+getFilteredRowModel: getFilteredRowModel(),
+getPaginationRowModel: getPaginationRowModel(),
+initialState: {
+pagination: { pageSize: 20 },
+},
+});
+return (
+<table>
+<thead>
+{table.getHeaderGroups().map(headerGroup => (
+<tr key={headerGroup.id}>
+{headerGroup.headers.map(header => (
+<th key={header.id}>
+{flexRender(
+header.column.columnDef.header,
+header.getContext()
+)}
+</th>
+))}
+</tr>
+))}
+</thead>
+<tbody>
+{table.getRowModel().rows.map(row => (
+<tr key={row.id}>
+{row.getVisibleCells().map(cell => (
+<td key={cell.id}>
+{flexRender(cell.column.columnDef.cell,
+cell.getContext())}
+</td>
+))}
+</tr>
+))}
+</tbody>
+</table>
+);
+}
+Exportación:
+typescript
+--- Page 20 ---
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+function exportToExcel(reservations: Booking[]) {
+const data = reservations.map(r => ({
+Fecha: format(r.date, 'dd/MM/yyyy'),
+Hora: r.time,
+Cliente: r.customer.name,
+Teléfono: r.customer.phone,
+Email: r.customer.email,
+Personas: r.partySize,
+Mesa: r.table?.number || 'Sin asignar',
+Origen: r.source,
+Estado: r.status,
+Depósito: r.deposit?.amount || 0,
+}));
+const ws = XLSX.utils.json_to_sheet(data);
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, 'Reservas');
+XLSX.writeFile(wb, `reservas-${format(new Date(),
+'yyyy-MM-dd')}.xlsx`);
+}
+function exportToPDF(reservations: Booking[]) {
+const doc = new jsPDF();
+doc.text('Reporte de Reservas', 14, 15);
+doc.text(`Fecha: ${format(new Date(), 'dd/MM/yyyy')}`, 14,
+22);
+autoTable(doc, {
+startY: 30,
+head: [['Fecha', 'Hora', 'Cliente', 'Personas', 'Mesa',
+'Estado']],
+body: reservations.map(r => [
+format(r.date, 'dd/MM/yyyy'),
+r.time,
+r.customer.name,
+r.partySize,
+r.table?.number || '-',
+r.status,
+]),
+--- Page 21 ---
+});
+doc.save(`reservas-${format(new Date(),
+'yyyy-MM-dd')}.pdf`);
+}
+UI/UX:
+● Tabla con bordes sutiles y espaciado cómodo
+● Hover en fila → cambio de fondo
+● Checkboxes con animación de check
+● Badges de estado con colores consistentes
+● Iconos para origen (Web, WhatsApp, etc.)
+● Paginación con selector de página size
+● Filtros colapsables (show/hide)
+● Loading skeleton mientras cargan datos
+● Empty state si no hay reservas
+● Responsive: scroll horizontal en móvil, columnas ocultas
+VISTA 2.3: FLOOR PLAN (PLANO DE MESAS)
+REQUISITOS FUNCIONALES:
+Vista visual del restaurante con las mesas en su ubicación real.
+CARACTERÍSTICAS DEL PLANO:
+● Canvas interactivo: Área donde se dibujan las mesas
+● Mesas como elementos visuales:
+○ Formas: Circular, cuadrada, rectangular
+○ Tamaño proporcional a capacidad
+○ Color según estado:
+■ Verde: Disponible
+■ Amarillo: Reservada (próximamente)
+■ Rojo: Ocupada
+■ Gris: Fuera de servicio
+○ Número de mesa visible
+○ Número de personas (si está ocupada)
+○ Hora de reserva (si está reservada)
+● Zonas del restaurante:
+○ Interior
+○ Terraza
+○ Bar
+○ Salón privado
+○ Cada zona con nombre y color de fondo sutil
+● Drag & Drop:
+--- Page 22 ---
+○ Mover reservas de una mesa a otra
+○ Mover mesas de posición (solo para administradores)
+○ Redimensionar mesas (cambiar capacidad)
+● Click en mesa:
+○ Si está disponible → modal para crear reserva
+○ Si está reservada → modal de detalles de reserva
+○ Si está ocupada → opciones (check-out, extender tiempo, etc.)
+LEYENDA:
+Panel lateral con leyenda de colores y estados:
+● 🟢 Disponible
+● 🟡 Reservada
+● 🔴 Ocupada
+● ⚫ Fuera de servicio
+● 🔵 VIP
+CONTROLES:
+● Zoom in/out (scroll o botones)
+● Pan (arrastrar el canvas)
+● Reset view (volver a vista original)
+● Toggle zonas (mostrar/ocultar zonas)
+● Toggle números de mesa
+● Modo edición (mover mesas) vs Modo operación (solo ver)
+ESTADÍSTICAS EN TIEMPO REAL:
+Panel superior con métricas del floor plan:
+● Mesas disponibles: X / Total
+● Mesas ocupadas: X / Total
+● Tiempo promedio de ocupación: X min
+● Próxima mesa disponible: Mesa X en Y min
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// FloorPlan.tsx
+interface FloorPlanProps {
+restaurantId: string;
+branchId: string;
+tables: Table[];
+reservations: Booking[];
+onTableClick: (table: Table) => void;
+--- Page 23 ---
+onReservationDrop: (bookingId: string, tableId: string) =>
+void;
+}
+// TableElement.tsx
+interface TableElementProps {
+table: Table;
+reservation?: Booking;
+status: 'available' | 'reserved' | 'occupied' |
+'out-of-service';
+onClick: () => void;
+onDrop: (bookingId: string) => void;
+}
+// ZoneElement.tsx
+interface ZoneElementProps {
+zone: Zone;
+tables: Table[];
+}
+// FloorPlanControls.tsx
+interface FloorPlanControlsProps {
+onZoomIn: () => void;
+onZoomOut: () => void;
+onResetView: () => void;
+editMode: boolean;
+onEditModeToggle: () => void;
+}
+// FloorPlanLegend.tsx
+interface FloorPlanLegendProps {
+stats: {
+available: number;
+reserved: number;
+occupied: number;
+outOfService: number;
+};
+}
+Canvas con React Konva o Fabric.js:
+typescript
+import { Stage, Layer, Rect, Circle, Text } from
+'react-konva';
+function FloorPlan({ tables, reservations }) {
+--- Page 24 ---
+const [scale, setScale] = useState(1);
+const [position, setPosition] = useState({ x: 0, y: 0 });
+return (
+<Stage
+width={window.innerWidth}
+height={window.innerHeight}
+scaleX={scale}
+scaleY={scale}
+x={position.x}
+y={position.y}
+onWheel={handleWheel} // zoom
+onDragEnd={handleDragEnd} // pan
+>
+<Layer>
+{/* Zonas */}
+{zones.map(zone => (
+<Rect
+key={zone.id}
+x={zone.x}
+y={zone.y}
+width={zone.width}
+height={zone.height}
+fill={zone.color}
+opacity={0.2}
+/>
+))}
+{/* Mesas */}
+{tables.map(table => {
+const reservation = reservations.find(r => r.tableId
+=== table.id);
+const status = getTableStatus(table, reservation);
+return table.shape === 'circle' ? (
+<Circle
+key={table.id}
+x={table.x}
+y={table.y}
+radius={table.radius}
+fill={getStatusColor(status)}
+draggable={editMode}
+onClick={() => onTableClick(table)}
+--- Page 25 ---
+onDragEnd={(e) => handleTableDragEnd(table.id,
+e)}
+/>
+) : (
+<Rect
+key={table.id}
+x={table.x}
+y={table.y}
+width={table.width}
+height={table.height}
+fill={getStatusColor(status)}
+draggable={editMode}
+onClick={() => onTableClick(table)}
+onDragEnd={(e) => handleTableDragEnd(table.id,
+e)}
+/>
+);
+})}
+{/* Números de mesa */}
+{tables.map(table => (
+<Text
+key={`text-${table.id}`}
+x={table.x}
+y={table.y}
+text={table.number.toString()}
+fontSize={16}
+fill="white"
+align="center"
+verticalAlign="middle"
+/>
+))}
+</Layer>
+</Stage>
+);
+}
+API Endpoints:
+typescript
+// GET /api/floor-plan
+Query params:
+- branchId: string
+Response: {
+zones: Zone[],
+--- Page 26 ---
+tables: Table[],
+}
+// PUT /api/tables/{id}
+Body: {
+x?: number,
+y?: number,
+width?: number,
+height?: number,
+capacity?: number,
+zoneId?: string,
+}
+// POST /api/floor-plan/zones
+Body: {
+name: string,
+x: number,
+y: number,
+width: number,
+height: number,
+color: string,
+}
+Database Schema:
+prisma
+model Table {
+id String @id @default(uuid())
+branchId String
+number Int
+shape String // circle, square, rectangle
+x Float
+y Float
+width Float? // para square/rectangle
+height Float? // para square/rectangle
+radius Float? // para circle
+capacity Int
+zoneId String?
+isActive Boolean @default(true)
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+branch Branch @relation(fields: [branchId],
+references: [id])
+zone Zone? @relation(fields: [zoneId], references:
+[id])
+--- Page 27 ---
+reservations Booking[]
+@@unique([branchId, number])
+}
+model Zone {
+id String @id @default(uuid())
+branchId String
+name String
+x Float
+y Float
+width Float
+height Float
+color String
+createdAt DateTime @default(now())
+branch Branch @relation(fields: [branchId], references:
+[id])
+tables Table[]
+}
+UI/UX:
+● Canvas con fondo de cuadrícula sutil
+● Mesas con sombras para dar profundidad
+● Animación de transición al cambiar estado
+● Tooltip al hacer hover en mesa (muestra detalles)
+● Drag preview semi-transparente
+● Snap to grid al mover mesas (cada 10px)
+● Zoom suave con scroll
+● Indicador de zoom actual (ej: 100%)
+● Minimap en esquina (vista general del plano)
+● Responsive: scroll y zoom en móvil, controles completos en desktop
+SECCIÓN 3: CLIENTES (CRM)
+REQUISITOS FUNCIONALES:
+Sistema de gestión de clientes (CRM básico) para conocer y fidelizar a los
+comensales.
+LISTA DE CLIENTES:
+Tabla con todos los clientes que han reservado alguna vez.
+COLUMNAS:
+--- Page 28 ---
+Columna Contenido Ordenable Filtrable
+Nombre Nombre completo ✓ ✓
+Email Email ✓ ✓
+Teléfono Teléfono ✗ ✓
+Visitas Número de visitas ✓ ✓
+Última visita Fecha de última ✓ ✗
+reserva
+Gasto total Suma de ✓ ✗
+depósitos pagados
+Rating Promedio de rating ✓ ✗
+(1-5)
+Segmento VIP / Regular / ✗ ✓
+Nuevo / Inactivo
+Acciones Ver perfil, Enviar ✗ ✗
+mensaje
+FILTROS AVANZADOS:
+● Búsqueda por nombre, email o teléfono
+● Filtro por segmento (VIP, Regular, Nuevo, Inactivo)
+● Filtro por número de visitas (1, 2-5, 6-10, 10+)
+● Filtro por fecha de última visita (último mes, 3 meses, 6 meses, +1 año)
+● Filtro por origen de reservas (Web, WhatsApp, Llamada)
+● Filtro por gasto total (rangos personalizados)
+PERFIL DEL CLIENTE:
+Al hacer click en un cliente, se abre su perfil completo:
+Header:
+● Foto de perfil (si tiene, o avatar generado con iniciales)
+● Nombre completo
+--- Page 29 ---
+● Email y teléfono (con links)
+● Segmento (badge de color)
+● Fecha de primera visita
+● Total de visitas
+Tabs:
+1. Resumen:
+○ Métricas clave:
+■ Total de visitas
+■ Gasto total
+■ Promedio de personas por reserva
+■ Promedio de gasto por visita
+■ Días desde última visita
+○ Gráfico de visitas por mes (últimos 12 meses)
+○ Tipo de evento más frecuente
+○ Día de la semana preferido
+○ Hora preferida
+2. Historial de Reservas:
+○ Lista de todas las reservas del cliente
+○ Cada reserva muestra:
+■ Fecha y hora
+■ Número de personas
+■ Mesa asignada
+■ Estado (Completada, No-show, Cancelada)
+■ Rating dado (si aplica)
+■ Notas internas
+○ Click en reserva → abre detalles
+3. Preferencias:
+○ Tipo de evento favorito
+○ Solicitudes especiales frecuentes (ej: "Siempre pide silla alta")
+○ Alergias o restricciones alimentarias
+○ Bebidas preferidas
+○ Platos favoritos (si el POS integra)
+○ Mesa preferida
+○ Notas del restaurante (textarea editable)
+4. Comunicaciones:
+○ Historial de emails enviados
+○ Historial de WhatsApps enviados
+○ Historial de SMS enviados
+○ Preferencias de comunicación:
+■ Email (Sí/No)
+■ WhatsApp (Sí/No)
+■ SMS (Sí/No)
+--- Page 30 ---
+■ Promociones (Sí/No)
+○ Fecha de última comunicación
+○ Botón "Enviar mensaje" (abre modal)
+5. Feedback:
+○ Lista de reseñas/feedback dado por el cliente
+○ Rating promedio
+○ Comentarios textuales
+○ Fecha de cada feedback
+6. Etiquetas:
+○ Etiquetas personalizadas (ej: "Celíaco", "Cliente corporativo",
+"Influencer")
+○ Crear nueva etiqueta
+○ Agregar/quitar etiquetas
+SEGMENTACIÓN AUTOMÁTICA:
+El sistema clasifica automáticamente a los clientes en segmentos:
+● VIP: +10 visitas O +$500.000 COP gastado
+● Regular: 3-10 visitas
+● Nuevo: 1-2 visitas
+● Inactivo: No ha venido en +6 meses
+● En riesgo: No ha venido en +3 meses (pero era regular)
+● Alto valor: Gasto promedio por visita >$100.000 COP
+ACCIONES MASIVAS:
+● Seleccionar múltiples clientes → acciones:
+○ Enviar email masivo
+○ Enviar WhatsApp masivo
+○ Agregar etiqueta
+○ Cambiar segmento manualmente
+○ Exportar a Excel/CSV
+EXPORTACIÓN:
+● Exportar lista de clientes a Excel/CSV
+● Exportar segmento específico
+● Incluir/excluir campos personalizados
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// CustomersList.tsx
+interface CustomersListProps {
+--- Page 31 ---
+restaurantId: string;
+}
+// CustomerProfile.tsx
+interface CustomerProfileProps {
+customerId: string;
+}
+// CustomerSummary.tsx
+interface CustomerSummaryProps {
+customer: Customer;
+stats: CustomerStats;
+}
+// CustomerReservationsHistory.tsx
+interface CustomerReservationsHistoryProps {
+customerId: string;
+}
+// CustomerPreferences.tsx
+interface CustomerPreferencesProps {
+customerId: string;
+preferences: CustomerPreferences;
+onUpdate: (preferences: CustomerPreferences) => void;
+}
+// CustomerCommunications.tsx
+interface CustomerCommunicationsProps {
+customerId: string;
+communications: Communication[];
+}
+// CustomerTags.tsx
+interface CustomerTagsProps {
+customerId: string;
+tags: string[];
+onAddTag: (tag: string) => void;
+onRemoveTag: (tag: string) => void;
+}
+// CustomerFilters.tsx
+interface CustomerFiltersProps {
+filters: CustomerFilters;
+onFilterChange: (filters: CustomerFilters) => void;
+--- Page 32 ---
+}
+API Endpoints:
+typescript
+// GET /api/customers
+Query params:
+- restaurantId: string
+- search?: string
+- segment?: string
+- minVisits?: number
+- maxVisits?: number
+- lastVisitAfter?: date
+- lastVisitBefore?: date
+- page?: number
+- pageSize?: number
+Response: {
+customers: Customer[],
+total: number,
+page: number,
+pageSize: number,
+}
+// GET /api/customers/{id}
+Response: {
+customer: Customer,
+stats: CustomerStats,
+preferences: CustomerPreferences,
+communications: Communication[],
+tags: string[],
+}
+// PUT /api/customers/{id}
+Body: {
+name?: string,
+email?: string,
+phone?: string,
+preferences?: CustomerPreferences,
+notes?: string,
+tags?: string[],
+}
+// POST /api/customers/{id}/communications
+Body: {
+type: 'email' | 'whatsapp' | 'sms',
+--- Page 33 ---
+message: string,
+sentAt: string,
+}
+// POST /api/customers/bulk-action
+Body: {
+customerIds: string[],
+action: 'send-email' | 'send-whatsapp' | 'add-tag' |
+'remove-tag' | 'export',
+payload?: any,
+}
+Database Schema:
+prisma
+model Customer {
+id String @id @default(uuid())
+restaurantId String
+name String
+email String?
+phone String?
+segment String @default("new") // vip, regular,
+new, inactive, at-risk
+totalVisits Int @default(0)
+totalSpent Float @default(0)
+avgPartySize Float @default(0)
+avgSpendPerVisit Float @default(0)
+firstVisitAt DateTime?
+lastVisitAt DateTime?
+notes String?
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id])
+reservations Booking[]
+preferences CustomerPreferences?
+communications Communication[]
+tags CustomerTag[]
+feedback Feedback[]
+@@unique([restaurantId, email])
+}
+model CustomerPreferences {
+id String @id @default(uuid())
+--- Page 34 ---
+customerId String @unique
+favoriteEventType String?
+frequentRequests String[] // array de strings
+allergies String[]
+favoriteDrinks String[]
+favoriteDishes String[]
+preferredTableId String?
+preferredDayOfWeek Int? // 0-6
+preferredTime String? // "19:00"
+contactEmail Boolean @default(true)
+contactWhatsApp Boolean @default(true)
+contactSMS Boolean @default(false)
+contactPromotions Boolean @default(false)
+customer Customer @relation(fields: [customerId],
+references: [id], onDelete: Cascade)
+}
+model CustomerTag {
+id String @id @default(uuid())
+customerId String
+tag String
+createdAt DateTime @default(now())
+customer Customer @relation(fields: [customerId],
+references: [id], onDelete: Cascade)
+@@unique([customerId, tag])
+}
+model Communication {
+id String @id @default(uuid())
+customerId String
+type String // email, whatsapp, sms
+message String
+sentAt DateTime
+readAt DateTime?
+customer Customer @relation(fields: [customerId],
+references: [id], onDelete: Cascade)
+}
+Segmentación Automática:
+typescript
+// Cron job que se ejecuta diariamente
+--- Page 35 ---
+async function updateCustomerSegments(restaurantId: string) {
+const customers = await prisma.customer.findMany({
+where: { restaurantId },
+include: { reservations: true },
+});
+for (const customer of customers) {
+let segment = 'new';
+const daysSinceLastVisit = customer.lastVisitAt
+? differenceInDays(new Date(), customer.lastVisitAt)
+: Infinity;
+if (customer.totalVisits >= 10 || customer.totalSpent >=
+500000) {
+segment = 'vip';
+} else if (customer.totalVisits >= 3) {
+segment = 'regular';
+} else if (customer.totalVisits >= 1) {
+segment = 'new';
+}
+// Check for at-risk
+if (segment === 'regular' && daysSinceLastVisit > 90) {
+segment = 'at-risk';
+}
+// Check for inactive
+if (daysSinceLastVisit > 180) {
+segment = 'inactive';
+}
+await prisma.customer.update({
+where: { id: customer.id },
+data: { segment },
+});
+}
+}
+UI/UX:
+● Tabla con diseño limpio y espaciado cómodo
+● Avatares con iniciales si no hay foto
+● Badges de segmento con colores distintivos
+● Iconos para acciones rápidas
+--- Page 36 ---
+● Modal de perfil con tabs claras
+● Gráficos interactivos (hover para detalles)
+● Timeline visual del historial
+● Empty states amigables
+● Loading skeletons
+● Responsive: tabla con scroll horizontal en móvil
+SECCIÓN 4: ANALYTICS
+REQUISITOS FUNCIONALES:
+Dashboard de analytics con métricas clave y gráficos para tomar decisiones de
+negocio.
+MÉTRICAS PRINCIPALES (KPIs):
+1. Reservas:
+○ Total de reservas (día/semana/mes/año)
+○ Tasa de crecimiento vs período anterior
+○ Reservas por canal de origen (Web, WhatsApp, Llamada, Walk-in)
+○ Tasa de conversión (visitantes web → reservas)
+2. Ocupación:
+○ Porcentaje de ocupación promedio
+○ Picos de ocupación (días/horas)
+○ Mesas más/menos populares
+○ Tiempo promedio de rotación de mesa
+3. Clientes:
+○ Total de clientes únicos
+○ Nuevos clientes vs recurrentes
+○ Tasa de retención (% que vuelve)
+○ Valor promedio por cliente (LTV)
+4. No-Shows:
+○ Tasa de no-shows (%)
+○ No-shows por canal de origen
+○ No-shows por día de la semana
+○ Ingresos perdidos por no-shows
+5. Ingresos:
+○ Total de depósitos cobrados
+○ Ingresos estimados (basado en reservas)
+○ Ticket promedio por reserva
+○ Ticket promedio por persona
+GRÁFICOS:
+--- Page 37 ---
+1. Reservas por Día (Línea):
+○ Eje X: Días (últimos 30 días)
+○ Eje Y: Número de reservas
+○ Línea de reservas totales
+○ Línea de no-shows
+○ Hover: muestra detalles del día
+2. Ocupación por Hora (Barras):
+○ Eje X: Horas del día (12:00 - 23:00)
+○ Eje Y: Porcentaje de ocupación
+○ Barras de color según nivel (verde/amarillo/rojo)
+○ Línea de capacidad máxima
+3. Origen de Reservas (Donut/Pie):
+○ Porcentaje de reservas por canal
+○ Web, WhatsApp, Llamada, Walk-in, Instagram, etc.
+○ Click en segmento → filtra datos
+4. Distribución de Tamaño de Grupos (Barras):
+○ Eje X: Tamaño (1, 2, 3, 4, 5, 6, 7+)
+○ Eje Y: Número de reservas
+○ Útil para optimizar configuración de mesas
+5. Día de la Semana Más Popular (Barras Horizontales):
+○ Eje X: Número de reservas
+○ Eje Y: Días (Lun-Dom)
+○ Ordenado de mayor a menor
+6. Tendencia de Clientes Nuevos vs Recurrentes (Área Apilada):
+○ Eje X: Semanas/Meses
+○ Eje Y: Número de clientes
+○ Área verde: Clientes nuevos
+○ Área azul: Clientes recurrentes
+7. Heatmap de Ocupación (Calendario):
+○ Calendario de 30 días
+○ Color de cada día según ocupación (verde bajo → rojo alto)
+○ Click en día → muestra detalles
+FILTROS:
+● Rango de fechas (últimos 7 días, 30 días, 3 meses, 6 meses, 1 año,
+personalizado)
+● Sucursal (si hay varias)
+● Comparar con período anterior (Sí/No)
+● Tipo de evento (Cena romántica, Cumpleaños, etc.)
+EXPORTACIÓN:
+● Exportar reporte completo a PDF
+● Exportar datos a Excel/CSV
+--- Page 38 ---
+● Programar reportes automáticos por email (diario/semanal/mensual)
+INSIGHTS AUTOMÁTICOS:
+El sistema genera insights automáticos basados en los datos:
+● "📈 Tus reservas aumentaron 23% esta semana vs la anterior"
+● "⚠ Tu tasa de no-shows subió a 15% (promedio industry: 8%)"
+● "💡 Los viernes a las 20:00 son tu horario más popular"
+● "🎯 El 40% de tus reservas son para 2 personas"
+● "📱 El 65% de tus reservas vienen por WhatsApp"
+● "💰 Tu ticket promedio es $80.000 COP por reserva"
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// AnalyticsDashboard.tsx
+interface AnalyticsDashboardProps {
+restaurantId: string;
+branchId?: string;
+}
+// KPICards.tsx
+interface KPICardsProps {
+metrics: AnalyticsMetrics;
+dateRange: DateRange;
+}
+// ReservationsChart.tsx
+interface ReservationsChartProps {
+data: Array<{
+date: string;
+total: number;
+noShows: number;
+}>;
+}
+// OccupancyByHourChart.tsx
+interface OccupancyByHourChartProps {
+data: Array<{
+hour: string;
+occupancy: number;
+capacity: number;
+}>;
+--- Page 39 ---
+}
+// SourceDistributionChart.tsx
+interface SourceDistributionChartProps {
+data: Array<{
+source: string;
+count: number;
+percentage: number;
+}>;
+}
+// PartySizeDistributionChart.tsx
+interface PartySizeDistributionChartProps {
+data: Array<{
+size: number;
+count: number;
+}>;
+}
+// DayOfWeekChart.tsx
+interface DayOfWeekChartProps {
+data: Array<{
+day: string;
+count: number;
+}>;
+}
+// NewVsReturningChart.tsx
+interface NewVsReturningChartProps {
+data: Array<{
+date: string;
+new: number;
+returning: number;
+}>;
+}
+// OccupancyHeatmap.tsx
+interface OccupancyHeatmapProps {
+data: Array<{
+date: string;
+occupancy: number;
+}>;
+}
+--- Page 40 ---
+// InsightsPanel.tsx
+interface InsightsPanelProps {
+insights: Insight[];
+}
+// AnalyticsFilters.tsx
+interface AnalyticsFiltersProps {
+dateRange: DateRange;
+branchId?: string;
+onFilterChange: (filters: AnalyticsFilters) => void;
+}
+Recharts Implementation:
+typescript
+import {
+LineChart,
+Line,
+BarChart,
+Bar,
+PieChart,
+Pie,
+Cell,
+XAxis,
+YAxis,
+CartesianGrid,
+Tooltip,
+Legend,
+ResponsiveContainer,
+} from 'recharts';
+function ReservationsChart({ data }) {
+return (
+<ResponsiveContainer width="100%" height={300}>
+<LineChart data={data}>
+<CartesianGrid strokeDasharray="3 3" />
+<XAxis dataKey="date" />
+<YAxis />
+<Tooltip />
+<Legend />
+<Line
+type="monotone"
+dataKey="total"
+stroke="#3b82f6"
+strokeWidth={2}
+name="Total Reservas"
+--- Page 41 ---
+/>
+<Line
+type="monotone"
+dataKey="noShows"
+stroke="#ef4444"
+strokeWidth={2}
+name="No-Shows"
+/>
+</LineChart>
+</ResponsiveContainer>
+);
+}
+function SourceDistributionChart({ data }) {
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+'#8b5cf6'];
+return (
+<ResponsiveContainer width="100%" height={300}>
+<PieChart>
+<Pie
+data={data}
+cx="50%"
+cy="50%"
+labelLine={false}
+label={({ source, percentage }) => `${source}:
+${percentage}%`}
+outerRadius={100}
+fill="#8884d8"
+dataKey="count"
+>
+{data.map((entry, index) => (
+<Cell key={`cell-${index}`} fill={COLORS[index %
+COLORS.length]} />
+))}
+</Pie>
+<Tooltip />
+</PieChart>
+</ResponsiveContainer>
+);
+}
+API Endpoints:
+typescript
+// GET /api/analytics/overview
+--- Page 42 ---
+Query params:
+- restaurantId: string
+- branchId?: string
+- startDate: YYYY-MM-DD
+- endDate: YYYY-MM-DD
+Response: {
+metrics: {
+totalReservations: number,
+reservationGrowth: number, // percentage
+reservationsBySource: Array<{source: string, count:
+number}>,
+conversionRate: number,
+avgOccupancy: number,
+peakHours: Array<{hour: string, occupancy: number}>,
+popularTables: Array<{tableId: string, count: number}>,
+avgRotationTime: number, // minutes
+totalCustomers: number,
+newCustomers: number,
+returningCustomers: number,
+retentionRate: number,
+customerLTV: number,
+noShowRate: number,
+noShowsBySource: Array<{source: string, count: number}>,
+lostRevenue: number,
+totalDeposits: number,
+estimatedRevenue: number,
+avgTicketPerReservation: number,
+avgTicketPerPerson: number,
+},
+chartsData: {
+reservationsByDay: Array<{date: string, total: number,
+noShows: number}>,
+occupancyByHour: Array<{hour: string, occupancy: number,
+capacity: number}>,
+sourceDistribution: Array<{source: string, count: number,
+percentage: number}>,
+partySizeDistribution: Array<{size: number, count:
+number}>,
+dayOfWeekDistribution: Array<{day: string, count:
+number}>,
+newVsReturning: Array<{date: string, new: number,
+returning: number}>,
+--- Page 43 ---
+occupancyHeatmap: Array<{date: string, occupancy:
+number}>,
+},
+insights: Array<{
+type: 'positive' | 'warning' | 'suggestion',
+message: string,
+metric?: string,
+value?: number,
+}>,
+}
+// GET /api/analytics/export
+Query params:
+- format: 'pdf' | 'excel' | 'csv'
+- startDate: YYYY-MM-DD
+- endDate: YYYY-MM-DD
+Response: File (download)
+Generación de Insights:
+typescript
+function generateInsights(metrics: AnalyticsMetrics):
+Insight[] {
+const insights: Insight[] = [];
+// Reservation growth
+if (metrics.reservationGrowth > 10) {
+insights.push({
+type: 'positive',
+📈
+message: ` Tus reservas aumentaron
+${metrics.reservationGrowth}% este período`,
+metric: 'reservationGrowth',
+value: metrics.reservationGrowth,
+});
+}
+// No-show rate
+if (metrics.noShowRate > 10) {
+insights.push({
+type: 'warning',
+⚠
+message: ` Tu tasa de no-shows es
+${metrics.noShowRate}% (promedio industry: 8%)`,
+metric: 'noShowRate',
+value: metrics.noShowRate,
+});
+--- Page 44 ---
+}
+// Popular day
+const popularDay = metrics.dayOfWeekDistribution.sort((a, b)
+=> b.count - a.count)[0];
+insights.push({
+type: 'suggestion',
+💡
+message: ` ${popularDay.day} es tu día más popular con
+${popularDay.count} reservas`,
+metric: 'popularDay',
+value: popularDay.count,
+});
+// Source distribution
+const topSource = metrics.reservationsBySource.sort((a, b)
+=> b.count - a.count)[0];
+insights.push({
+type: 'suggestion',
+📱
+message: ` El ${Math.round(topSource.count /
+metrics.totalReservations * 100)}% de tus reservas vienen por
+${topSource.source}`,
+metric: 'topSource',
+value: topSource.count,
+});
+return insights;
+}
+UI/UX:
+● Cards de KPIs con iconos y colores distintivos
+● Gráficos interactivos (hover, click, zoom)
+● Tooltips detallados en gráficos
+● Leyendas claras
+● Animaciones suaves al cargar datos
+● Skeleton loaders mientras cargan
+● Empty states si no hay datos suficientes
+● Responsive: gráficos se adaptan al tamaño de pantalla
+● Dark mode support
+● Accesibilidad: ARIA labels en gráficos
+SECCIÓN 5: CONFIGURACIÓN
+--- Page 45 ---
+REQUISITOS FUNCIONALES:
+Panel de configuración para gestionar todos los aspectos del restaurante.
+SUBSECCIONES:
+1. Restaurante:
+○ Información básica (nombre, dirección, teléfono, email)
+○ Descripción
+○ Redes sociales
+○ Logo e imágenes
+○ Colores y branding
+2. Sucursales:
+○ Lista de sucursales
+○ Crear nueva sucursal
+○ Editar sucursal existente
+○ Eliminar sucursal
+○ Configurar horarios y capacidad por sucursal
+3. Horarios:
+○ Horarios de apertura por día de la semana
+○ Múltiples turnos por día (almuerzo, cena)
+○ Horarios especiales (festivos, eventos)
+○ Bloqueo de fechas (vacaciones, mantenimiento)
+4. Mesas:
+○ Configuración de tipos de mesa
+○ Capacidad de cada tipo
+○ Cantidad de mesas por tipo
+○ Floor plan editor (ver Sección 2.3)
+5. Pagos:
+○ Configurar depósitos (sí/no, porcentaje, monto fijo)
+○ Pasarelas de pago (Wompi, Stripe, PayU, ePayco)
+○ Credenciales de pasarelas
+○ Políticas de reembolso
+○ Cobro por no-show
+6. Personal:
+○ Lista de usuarios con acceso al dashboard
+○ Crear nuevo usuario
+○ Asignar roles y permisos
+○ Eliminar usuario
+○ Ver actividad de usuarios (logs)
+7. Integraciones:
+○ Conectar con POS (Vendty, SoftRestaurant, etc.)
+○ Conectar con Google Business
+○ Conectar con Google Calendar
+○ Webhooks configurables
+○ API keys para desarrolladores
+--- Page 46 ---
+8. Notificaciones:
+○ Configurar emails de confirmación
+○ Configurar recordatorios (WhatsApp, SMS, Email)
+○ Timing de recordatorios (24h antes, 2h antes)
+○ Templates de mensajes personalizables
+9. Políticas:
+○ Política de cancelación
+○ Política de no-shows
+○ Términos y condiciones
+○ Política de privacidad
+10. Avanzado:
+○ Dominio personalizado
+○ Widget embebible
+○ Exportar/importar datos
+○ Logs de auditoría
+○ Backup de datos
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// SettingsPage.tsx
+interface SettingsPageProps {
+restaurantId: string;
+}
+// RestaurantSettings.tsx
+interface RestaurantSettingsProps {
+restaurant: Restaurant;
+onUpdate: (data: Partial<Restaurant>) => void;
+}
+// BranchesSettings.tsx
+interface BranchesSettingsProps {
+branches: Branch[];
+onCreateBranch: (data: CreateBranchData) => void;
+onUpdateBranch: (id: string, data: Partial<Branch>) => void;
+onDeleteBranch: (id: string) => void;
+}
+// SchedulesSettings.tsx
+interface SchedulesSettingsProps {
+schedules: Schedule[];
+onUpdate: (schedules: Schedule[]) => void;
+}
+--- Page 47 ---
+// TablesSettings.tsx
+interface TablesSettingsProps {
+tableTypes: TableType[];
+onUpdate: (tableTypes: TableType[]) => void;
+}
+// PaymentSettings.tsx
+interface PaymentSettingsProps {
+paymentSettings: PaymentSettings;
+onUpdate: (data: Partial<PaymentSettings>) => void;
+}
+// StaffSettings.tsx
+interface StaffSettingsProps {
+staff: StaffMember[];
+onCreateStaff: (data: CreateStaffData) => void;
+onUpdateStaff: (id: string, data: Partial<StaffMember>) =>
+void;
+onDeleteStaff: (id: string) => void;
+}
+// IntegrationsSettings.tsx
+interface IntegrationsSettingsProps {
+integrations: Integration[];
+onConnect: (integrationId: string, credentials: any) =>
+void;
+onDisconnect: (integrationId: string) => void;
+}
+// NotificationsSettings.tsx
+interface NotificationsSettingsProps {
+settings: NotificationSettings;
+onUpdate: (settings: NotificationSettings) => void;
+}
+// PoliciesSettings.tsx
+interface PoliciesSettingsProps {
+policies: Policies;
+onUpdate: (policies: Policies) => void;
+}
+API Endpoints:
+typescript
+// GET /api/settings/restaurant
+--- Page 48 ---
+Response: Restaurant
+// PUT /api/settings/restaurant
+Body: Partial<Restaurant>
+Response: Restaurant
+// GET /api/settings/branches
+Response: Branch[]
+// POST /api/settings/branches
+Body: CreateBranchData
+Response: Branch
+// PUT /api/settings/branches/{id}
+Body: Partial<Branch>
+Response: Branch
+// DELETE /api/settings/branches/{id}
+Response: { success: boolean }
+// GET /api/settings/schedules
+Response: Schedule[]
+// PUT /api/settings/schedules
+Body: Schedule[]
+Response: Schedule[]
+// GET /api/settings/payment
+Response: PaymentSettings
+// PUT /api/settings/payment
+Body: Partial<PaymentSettings>
+Response: PaymentSettings
+// GET /api/settings/staff
+Response: StaffMember[]
+// POST /api/settings/staff
+Body: CreateStaffData
+Response: StaffMember
+// PUT /api/settings/staff/{id}
+Body: Partial<StaffMember>
+Response: StaffMember
+--- Page 49 ---
+// DELETE /api/settings/staff/{id}
+Response: { success: boolean }
+// GET /api/settings/integrations
+Response: Integration[]
+// POST /api/settings/integrations/{id}/connect
+Body: { credentials: any }
+Response: Integration
+// POST /api/settings/integrations/{id}/disconnect
+Response: { success: boolean }
+UI/UX:
+● Sidebar de navegación con las subsecciones
+● Formularios con validación en tiempo real
+● Botones "Guardar" y "Cancelar" en cada sección
+● Confirmación antes de eliminar datos críticos
+● Tooltips explicativos en campos complejos
+● Preview en vivo de cambios (ej: colores, logo)
+● Loading states al guardar
+● Mensajes de éxito/error claros
+● Responsive: sidebar colapsable en móvil
+● Accesibilidad: ARIA labels, keyboard navigation
+SECCIÓN 6: MENSAJES (AGENTES IA)
+REQUISITOS FUNCIONALES:
+Panel para ver y gestionar las conversaciones de los agentes de IA (WhatsApp, chat
+web, etc.).
+LISTA DE CONVERSACIONES:
+● Lista de todas las conversaciones activas y recientes
+● Cada conversación muestra:
+○ Avatar del cliente (o iniciales)
+○ Nombre del cliente
+○ Canal (WhatsApp, Web Chat, Instagram, etc.)
+○ Último mensaje (preview)
+○ Timestamp del último mensaje
+○ Badge de no leídos
+○ Estado: Activa / Resuelta / Bot
+--- Page 50 ---
+● Ordenamiento: Más reciente primero
+● Filtros:
+○ Por canal (WhatsApp, Web, Instagram, etc.)
+○ Por estado (Activa, Resuelta, Bot)
+○ Por fecha (Hoy, Ayer, Última semana)
+● Búsqueda por nombre o teléfono
+DETALLE DE CONVERSACIÓN:
+Al hacer click en una conversación, se abre el chat completo:
+Header:
+● Nombre del cliente
+● Canal (icono de WhatsApp, Web, etc.)
+● Estado: "Bot atendiendo" / "Humano atendiendo"
+● Botones:
+○ 🤖 Transferir a bot
+○ 👤 Tomar control (transferir a humano)
+○ ✅ Marcar como resuelta
+○ 🗑 Eliminar conversación
+Mensajes:
+● Timeline de mensajes (orden cronológico)
+● Cada mensaje muestra:
+○ Avatar del emisor (cliente o bot/humano)
+○ Nombre del emisor
+○ Timestamp
+○ Contenido del mensaje (texto, imagen, audio, etc.)
+○ Badge si fue enviado por bot o humano
+○ Estado del mensaje (Enviado, Entregado, Leído)
+● Mensajes del cliente: alineados a la izquierda
+● Mensajes del bot/humano: alineados a la derecha
+● Indicador de "Bot está escribiendo..." si el bot está procesando
+Input de Mensaje:
+● Textarea para escribir mensaje manual
+● Botón "Enviar"
+● Botones de respuestas rápidas (predefinidas)
+● Adjuntar archivos (imágenes, PDFs)
+● Emojis
+● Si está en modo bot: muestra "Modo Bot Activado" y no se puede escribir
+manualmente
+Panel Lateral (Información del Cliente):
+--- Page 51 ---
+● Datos del cliente (nombre, teléfono, email)
+● Historial de reservas
+● Última reserva
+● Total de reservas
+● Notas
+● Etiquetas
+ACCIONES:
+● Transferir a Bot: El bot continúa la conversación automáticamente
+● Tomar Control: Un humano toma la conversación (el bot se silencia)
+● Marcar como Resuelta: Cierra la conversación
+● Enviar Mensaje Manual: Escribe y envía mensaje como humano
+● Usar Respuesta Rápida: Inserta mensaje predefinido
+● Ver Transcripción Completa: Exporta la conversación a PDF
+ESTADÍSTICAS DE AGENTES IA:
+Panel superior con métricas:
+● Conversaciones totales (hoy/semana/mes)
+● Conversaciones atendidas por bot (%)
+● Conversaciones transferidas a humano (%)
+● Tiempo promedio de respuesta del bot
+● Tasa de resolución del bot (% de conversaciones resueltas sin humano)
+● Reservas generadas por bot
+REQUISITOS TÉCNICOS:
+Componentes:
+typescript
+// ConversationsList.tsx
+interface ConversationsListProps {
+conversations: Conversation[];
+onSelectConversation: (conversationId: string) => void;
+selectedConversationId?: string;
+}
+// ConversationDetail.tsx
+interface ConversationDetailProps {
+conversation: Conversation;
+onSendMessage: (message: string) => void;
+onTransferToBot: () => void;
+onTakeControl: () => void;
+onMarkResolved: () => void;
+}
+--- Page 52 ---
+// MessageBubble.tsx
+interface MessageBubbleProps {
+message: Message;
+isFromCustomer: boolean;
+}
+// MessageInput.tsx
+interface MessageInputProps {
+onSend: (message: string) => void;
+disabled?: boolean;
+}
+// QuickReplies.tsx
+interface QuickRepliesProps {
+replies: string[];
+onSelect: (reply: string) => void;
+}
+// CustomerInfoPanel.tsx
+interface CustomerInfoPanelProps {
+customer: Customer;
+reservations: Booking[];
+}
+// ConversationFilters.tsx
+interface ConversationFiltersProps {
+filters: ConversationFilters;
+onFilterChange: (filters: ConversationFilters) => void;
+}
+// BotStats.tsx
+interface BotStatsProps {
+stats: BotStats;
+}
+Real-time con Socket.io:
+typescript
+// server/socket.ts
+io.on('connection', (socket) => {
+socket.on('join-conversation', (conversationId: string) => {
+socket.join(`conversation-${conversationId}`);
+});
+--- Page 53 ---
+socket.on('send-message', async (data: { conversationId:
+string, message: string }) => {
+const message = await saveMessage(data);
+io.to(`conversation-${data.conversationId}`).emit('new-message
+', message);
+});
+// Cuando el bot responde
+socket.on('bot-response', (data: { conversationId: string,
+message: string }) => {
+io.to(`conversation-${data.conversationId}`).emit('new-message
+', {
+...data,
+sender: 'bot',
+});
+});
+});
+// client/hooks/useConversation.ts
+export function useConversation(conversationId: string) {
+const [messages, setMessages] = useState<Message[]>([]);
+useEffect(() => {
+const socket = io(process.env.NEXT_PUBLIC_WS_URL!);
+socket.emit('join-conversation', conversationId);
+socket.on('new-message', (message: Message) => {
+setMessages(prev => [...prev, message]);
+});
+return () => {
+socket.disconnect();
+};
+}, [conversationId]);
+const sendMessage = (text: string) => {
+socket.emit('send-message', { conversationId, message:
+text });
+};
+return { messages, sendMessage };
+--- Page 54 ---
+}
+API Endpoints:
+typescript
+// GET /api/conversations
+Query params:
+- restaurantId: string
+- channel?: string
+- status?: string
+- search?: string
+- page?: number
+- pageSize?: number
+Response: {
+conversations: Conversation[],
+total: number,
+}
+// GET /api/conversations/{id}
+Response: {
+conversation: Conversation,
+messages: Message[],
+customer: Customer,
+}
+// POST /api/conversations/{id}/messages
+Body: {
+message: string,
+sender: 'human' | 'bot',
+}
+Response: Message
+// POST /api/conversations/{id}/transfer-to-bot
+Response: { success: boolean }
+// POST /api/conversations/{id}/take-control
+Response: { success: boolean }
+// POST /api/conversations/{id}/resolve
+Response: { success: boolean }
+// GET /api/conversations/stats
+Query params:
+- restaurantId: string
+- startDate: YYYY-MM-DD
+--- Page 55 ---
+- endDate: YYYY-MM-DD
+Response: {
+totalConversations: number,
+botHandled: number,
+humanHandled: number,
+avgResponseTime: number,
+resolutionRate: number,
+bookingsGenerated: number,
+}
+Database Schema:
+prisma
+model Conversation {
+id String @id @default(uuid())
+restaurantId String
+customerId String?
+channel String // whatsapp, web, instagram,
+facebook
+status String @default("active") // active,
+resolved, bot
+assignedTo String? // userId del humano asignado
+lastMessageAt DateTime @default(now())
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+restaurant Restaurant @relation(fields: [restaurantId],
+references: [id])
+customer Customer? @relation(fields: [customerId],
+references: [id])
+messages Message[]
+@@index([restaurantId, status])
+}
+model Message {
+id String @id @default(uuid())
+conversationId String
+sender String // customer, bot, human
+senderId String? // userId si es humano
+content String
+messageType String @default("text") // text, image,
+audio, file
+mediaUrl String?
+--- Page 56 ---
+status String @default("sent") // sent,
+delivered, read
+createdAt DateTime @default(now())
+conversation Conversation @relation(fields:
+[conversationId], references: [id], onDelete: Cascade)
+@@index([conversationId, createdAt])
+}
+UI/UX:
+● Layout de 2 columnas: lista de conversaciones (izquierda)
++ detalle (derecha)
+● Lista de conversaciones con scroll
+● Detalle con header, mensajes y input
+● Mensajes con burbujas de chat (estilo WhatsApp)
+● Avatares con iniciales o fotos
+● Timestamps en formato relativo ("Hace 5 min")
+● Indicador de "escribiendo..."
+● Badges de no leídos
+● Colores por canal (verde WhatsApp, azul Web, etc.)
+● Animaciones suaves al recibir mensajes nuevos
+● Responsive: en móvil, lista y detalle son pantallas
+separadas
+● Accesibilidad: ARIA labels, keyboard navigation
+RESUMEN DE ENTREGABLES ESPERADOS
+Después de implementar este módulo, debes tener:
+✅
+Dashboard Overview:
+● Métricas clave en tiempo real
+● Gráfico de ocupación por hora
+● Lista de próximas reservas
+● Panel de alertas y notificaciones
+● Actualizaciones en tiempo real (WebSockets)
+✅
+Gestión de Reservas:
+● Vista de calendario (día/semana/mes)
+● Vista de lista con filtros avanzados
+● Vista de floor plan (plano de mesas)
+--- Page 57 ---
+● Modal de detalles de reserva
+● Acciones rápidas (check-in, no-show, editar, cancelar)
+● Drag & drop para mover reservas
+● Exportación a Excel/PDF
+✅
+CRM de Clientes:
+● Lista de clientes con filtros
+● Perfil completo del cliente
+● Historial de reservas
+● Preferencias y etiquetas
+● Segmentación automática (VIP, Regular, Nuevo, Inactivo)
+● Historial de comunicaciones
+● Acciones masivas
+✅
+Analytics:
+● KPIs principales
+● Gráficos interactivos (reservas, ocupación, origen, etc.)
+● Heatmap de ocupación
+● Insights automáticos
+● Exportación de reportes
+● Filtros por fecha y sucursal
+✅
+Configuración:
+● Gestión de restaurante y sucursales
+● Configuración de horarios y mesas
+● Configuración de pagos y pasarelas
+● Gestión de personal y permisos
+● Integraciones (POS, Google, Webhooks)
+● Notificaciones y políticas
+✅
+Mensajes (Agentes IA):
+● Lista de conversaciones
+● Chat en tiempo real
+● Transferencia bot ↔ humano
+● Respuestas rápidas
+● Estadísticas de agentes IA
+● Información del cliente en panel lateral
+✅
+UI/UX:
+--- Page 58 ---
+● Diseño responsive (mobile-first)
+● Dark mode support
+● Accesibilidad WCAG 2.1 AA
+● Animaciones suaves
+● Loading states y skeleton loaders
+● Error handling robusto
+● Notificaciones toast
+✅
+Real-time:
+● WebSockets para actualizaciones en tiempo real
+● Notificaciones push
+● Sincronización entre múltiples usuarios
+✅
+Testing:
+● Tests unitarios de componentes
+● Tests de integración de flujos
+● Tests E2E con Playwright
+INSTRUCCIONES PARA ANTIGRAVITY
+1. Comienza con la estructura de navegación (sidebar,
+routing)
+2. Implementa el sistema de autenticación y roles
+3. Desarrolla el Overview (métricas y gráficos básicos)
+4. Construye la gestión de reservas (calendario, lista,
+floor plan)
+5. Implementa el CRM de clientes
+6. Agrega el dashboard de analytics
+7. Crea el panel de configuración
+8. Implementa el módulo de mensajes (agentes IA)
+9. Agrega real-time con WebSockets
+10. Optimiza y asegura la calidad (tests, performance,
+accesibilidad)
+Prioridad:
+1. Gestión de reservas (core del negocio)
+2. Overview (dashboard principal)
+3. Configuración básica
+4. CRM de clientes
+--- Page 59 ---
+5. Analytics
+6. Mensajes (agentes IA)
+7. Características avanzadas
+Nota: Cada sección debe ser funcional independientemente, pero
+integrarse perfectamente con las demás. El dashboard debe ser
+rápido y responsivo, ya que se usa durante el servicio del
+restaurante.
+¿Listo para comenzar? Empieza por la estructura de navegación
+y el sistema de autenticación, luego avanza al Overview y la
+gestión de reservas.
+
+================================================================================
+FILE: agendamiento modulo 4.pdf
+================================================================================
+
+--- Page 1 ---
+PROMPT TÉCNICO PARA ANTIGRAVITY - MÓDULO 4:
+AGENTES DE IA UNIFICADOS
+markdown
+# CONTEXTO DEL MÓDULO 4
+Estás construyendo un sistema de AGENTES DE IA UNIFICADOS que
+atienden reservas por:
+1. WhatsApp (vía Chatwoot + Twilio)
+2. Llamadas telefónicas (vía Vapi.ai + Twilio Voice)
+3. Chat web (vía Chatwoot)
+Todos los canales están unificados en un solo dashboard y
+crean reservas en Cal.com.
+STACK TECNOLÓGICO:
+- WhatsApp: Chatwoot + Twilio WhatsApp API
+- Voz: Vapi.ai + Twilio Voice + ElevenLabs
+- Chat Web: Chatwoot (widget embebible)
+- LLM: OpenAI GPT-4o (con Function Calling)
+- Backend: Next.js API Routes + Node.js
+- Base de Datos: PostgreSQL + Redis (caché)
+- Real-time: Socket.io
+- Cal.com: API v2 para crear reservas
+- LangChain o Vercel AI SDK (orquestación)
+- Zod (validación)
+---
+## ARQUITECTURA GENERAL
+**FLUJO DE DATOS:**
+WhatsApp → Twilio → Chatwoot → Webhook → Tu Backend → GPT-4o → Cal.com
+Voz → Twilio → Vapi.ai → GPT-4o → Cal.com
+Chat Web → Chatwoot → Webhook → Tu Backend → GPT-4o → Cal.com
+**COMPONENTES PRINCIPALES:**
+1. **Chatwoot** (Self-hosted o Cloud):
+- Centraliza WhatsApp y chat web
+- Proporciona interfaz para que humanos tomen control
+--- Page 2 ---
+- Webhooks para enviar mensajes a tu backend
+- API para enviar respuestas
+2. **Vapi.ai**:
+- Maneja llamadas telefónicas entrantes
+- Speech-to-text (STT) en tiempo real
+- Text-to-speech (TTS) con ElevenLabs
+- Function calling para consultar disponibilidad y crear reservas
+3. **Tu Backend**:
+- Recibe webhooks de Chatwoot
+- Procesa mensajes con GPT-4o
+- Consulta disponibilidad en Cal.com
+- Crea reservas vía Cal.com API
+- Envía respuestas a Chatwoot
+4. **Dashboard**:
+- Muestra conversaciones en tiempo real
+- Permite transferir bot ↔ humano
+- Estadísticas de agentes IA
+---
+## SECCIÓN 1: CONFIGURACIÓN DE CHATWOOT
+### REQUISITOS FUNCIONALES:
+**INSTALACIÓN Y SETUP:**
+Opción A: Chatwoot Cloud (SaaS)
+- Crear cuenta en chatwoot.com
+- Crear inbox de WhatsApp
+- Configurar Twilio WhatsApp API
+- Obtener API keys
+Opción B: Chatwoot Self-hosted
+- Deploy en servidor propio (Docker)
+- Configurar base de datos PostgreSQL
+- Configurar Redis
+- Configurar Twilio WhatsApp API
+**CONFIGURACIÓN DE WHATSAPP:**
+1. **Twilio Setup:**
+--- Page 3 ---
+- Crear cuenta en Twilio
+- Activar WhatsApp Sandbox (testing) o WhatsApp Business API (producción)
+- Obtener Account SID y Auth Token
+- Configurar webhook de mensajes entrantes
+2. **Chatwoot WhatsApp Inbox:**
+- Crear nuevo inbox → WhatsApp
+- Seleccionar "Twilio" como provider
+- Ingresar credenciales de Twilio
+- Configurar número de WhatsApp del restaurante
+- Probar envío/recepción
+3. **Webhooks:**
+- Configurar webhook en Chatwoot para:
+* Mensajes entrantes → Tu backend
+* Estado de conversación → Tu backend
+* Transferencia a humano → Tu backend
+- Endpoint: `https://tudominio.com/api/webhooks/chatwoot`
+**CONFIGURACIÓN DE CHAT WEB:**
+1. **Widget de Chat:**
+- Chatwoot genera código JavaScript
+- Restaurante pega código en su página web
+- Widget aparece en esquina inferior derecha
+- Personalizable (colores, posición, mensaje de bienvenida)
+2. **Canales adicionales:**
+- Facebook Messenger (opcional)
+- Instagram DM (opcional)
+- Email (opcional)
+- Telegram (opcional)
+### REQUISITOS TÉCNICOS:
+**Chatwoot API Integration:**
+```typescript
+// lib/chatwoot.ts
+import axios from 'axios';
+const CHATWOOT_API_URL = process.env.CHATWOOT_API_URL;
+const CHATWOOT_TOKEN = process.env.CHATWOOT_TOKEN;
+--- Page 4 ---
+export async function sendMessageToChatwoot(
+inboxId: string,
+conversationId: string,
+message: string,
+messageType: 'outgoing' | 'template' = 'outgoing'
+) {
+const response = await axios.post(
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}/mess
+ages`,
+{
+content: message,
+message_type: messageType,
+},
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+'Content-Type': 'application/json',
+},
+}
+);
+return response.data;
+}
+export async function getConversationDetails(conversationId: string) {
+const response = await axios.get(
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}`,
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+},
+}
+);
+return response.data;
+}
+export async function assignConversationToBot(conversationId: string) {
+await axios.post(
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}/toggle
+Status`,
+{
+--- Page 5 ---
+status: 'open',
+},
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+}
+}
+);
+// Agregar etiqueta "bot-attending"
+await axios.post(
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}/labels
+`,
+{
+labels: ['bot-attending'],
+},
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+}
+}
+);
+}
+export async function assignConversationToHuman(conversationId: string, userId:
+string) {
+await axios.post(
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}/toggle
+Assign`,
+{
+assignee_id: userId,
+},
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+}
+}
+);
+// Remover etiqueta "bot-attending"
+await axios.post(
+--- Page 6 ---
+`${CHATWOOT_API_URL}/api/v1/accounts/1/conversations/${conversationId}/labels
+`,
+{
+labels: ['human-attending'],
+},
+{
+headers: {
+'api_access_token': CHATWOOT_TOKEN,
+}
+}
+);
+}
+Webhook Handler:
+typescript
+// pages/api/webhooks/chatwoot.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { handleIncomingMessage } from
+'@/lib/ai-handlers/whatsapp';
+export default async function handler(
+req: NextApiRequest,
+res: NextApiResponse
+) {
+if (req.method !== 'POST') {
+return res.status(405).json({ error: 'Method not allowed'
+});
+}
+const event = req.body;
+// Verificar que es un mensaje nuevo
+if (event.event === 'message_created' &&
+event.message.message_type === 'incoming') {
+const { conversation, message } = event;
+// Procesar mensaje con IA
+await handleIncomingMessage({
+conversationId: conversation.id,
+inboxId: conversation.inbox_id,
+contactId: conversation.meta.sender.id,
+contactName: conversation.meta.sender.name,
+contactPhone: conversation.meta.sender.phone_number,
+messageContent: message.content,
+--- Page 7 ---
+channel: 'whatsapp',
+});
+}
+// Evento: conversación transferida a humano
+if (event.event === 'conversation_status_changed') {
+const { conversation } = event;
+if (conversation.assignee_id && conversation.assignee_id
+!== null) {
+// Transferido a humano
+await handleTransferToHuman(conversation.id,
+conversation.assignee_id);
+}
+}
+res.status(200).json({ received: true });
+}
+UI/UX:
+● Chatwoot proporciona UI lista para el dashboard
+● Personalizar con colores del restaurante
+● Configurar respuestas automáticas de bienvenida
+● Configurar horarios de atención (fuera de horario → mensaje automático)
+SECCIÓN 2: CONFIGURACIÓN DE VAPI (LLAMADAS DE
+VOZ)
+REQUISITOS FUNCIONALES:
+SETUP DE VAPI:
+1. Crear cuenta en Vapi.ai:
+○ Registrarse en vapi.ai
+○ Obtener API key
+○ Configurar webhook
+2. Configurar Twilio Voice:
+○ Comprar número telefónico en Twilio
+○ Activar Voice API
+○ Configurar webhook de llamadas entrantes
+○ Conectar con Vapi
+3. Configurar Assistant en Vapi:
+--- Page 8 ---
+○ Crear nuevo assistant
+○ Configurar modelo: GPT-4o
+○ Configurar voz: ElevenLabs (seleccionar voz en español)
+○ Configurar system prompt
+○ Configurar functions (tools)
+FUNCTIONS/TOOLS PARA EL ASISTENTE DE VOZ:
+El asistente necesita estas funciones:
+1. checkAvailability:
+○ Consulta disponibilidad en Cal.com
+○ Parámetros: fecha, hora, número de personas
+○ Retorna: horarios disponibles
+2. createBooking:
+○ Crea reserva en Cal.com
+○ Parámetros: fecha, hora, personas, nombre, teléfono, email
+○ Retorna: confirmation code
+3. getRestaurantInfo:
+○ Información del restaurante (horarios, dirección, menú)
+○ Sin parámetros
+○ Retorna: información general
+4. transferToHuman:
+○ Transfiere llamada a humano
+○ Parámetros: reason
+○ Retorna: success
+REQUISITOS TÉCNICOS:
+Vapi Configuration:
+typescript
+// lib/vapi.ts
+import Vapi from '@vapi-ai/web';
+const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_API_KEY!);
+export interface AssistantConfig {
+model: {
+provider: 'openai';
+model: 'gpt-4o';
+};
+voice: {
+provider: 'elevenlabs';
+voiceId: string; // ej: "21m00Tcm4TlvDq8ikWAM" (Rachel)
+};
+--- Page 9 ---
+firstMessage: string;
+systemPrompt: string;
+functions: FunctionConfig[];
+}
+export const restaurantAssistantConfig: AssistantConfig = {
+model: {
+provider: 'openai',
+model: 'gpt-4o',
+},
+voice: {
+provider: 'elevenlabs',
+voiceId: '21m00Tcm4TlvDq8ikWAM', // Rachel - español
+neutro
+},
+firstMessage: '¡Hola! Bienvenido a [Nombre del Restaurante].
+Soy tu asistente virtual. ¿En qué puedo ayudarte hoy?',
+systemPrompt: `Eres un asistente virtual amable y
+profesional para un restaurante. Tu objetivo es ayudar a los
+clientes a hacer reservas.
+INSTRUCCIONES:
+1. Saluda de manera cálida y profesional
+2. Pregunta para cuántas personas y qué fecha/hora desean
+3. Usa la función checkAvailability para verificar
+disponibilidad
+4. Si hay disponibilidad, ofrece los horarios disponibles
+5. Cuando el cliente elija, usa createBooking para hacer la
+reserva
+6. Confirma la reserva con el código de confirmación
+7. Ofrece ayuda adicional si es necesario
+8. Si no puedes ayudar, ofrece transferir a un humano
+TONO:
+- Amable, profesional, pero cercano
+- Habla en español neutro
+- Sé conciso pero claro
+- Repite información importante (fecha, hora, número de
+personas)
+REGLAS:
+- Nunca inventes disponibilidad, siempre consulta con
+checkAvailability
+- Confirma siempre los datos antes de crear la reserva
+--- Page 10 ---
+- Si el cliente pide algo fuera de lo normal, ofrece
+transferir a humano
+- Maneja objeciones con empatía`,
+functions: [
+{
+name: 'checkAvailability',
+description: 'Verifica disponibilidad de mesas para una
+fecha, hora y número de personas',
+parameters: {
+type: 'object',
+properties: {
+date: {
+type: 'string',
+description: 'Fecha en formato YYYY-MM-DD',
+},
+time: {
+type: 'string',
+description: 'Hora en formato HH:mm',
+},
+partySize: {
+type: 'number',
+description: 'Número de personas',
+},
+},
+required: ['date', 'partySize'],
+},
+},
+{
+name: 'createBooking',
+description: 'Crea una reserva en el sistema',
+parameters: {
+type: 'object',
+properties: {
+date: {
+type: 'string',
+description: 'Fecha en formato YYYY-MM-DD',
+},
+time: {
+type: 'string',
+description: 'Hora en formato HH:mm',
+},
+partySize: {
+type: 'number',
+description: 'Número de personas',
+--- Page 11 ---
+},
+customerName: {
+type: 'string',
+description: 'Nombre completo del cliente',
+},
+customerPhone: {
+type: 'string',
+description: 'Teléfono del cliente',
+},
+customerEmail: {
+type: 'string',
+description: 'Email del cliente',
+},
+},
+required: ['date', 'time', 'partySize',
+'customerName', 'customerPhone'],
+},
+},
+{
+name: 'getRestaurantInfo',
+description: 'Obtiene información del restaurante
+(horarios, dirección, menú)',
+parameters: {
+type: 'object',
+properties: {},
+},
+},
+{
+name: 'transferToHuman',
+description: 'Transfiere la llamada a un agente humano',
+parameters: {
+type: 'object',
+properties: {
+reason: {
+type: 'string',
+description: 'Razón de la transferencia',
+},
+},
+required: ['reason'],
+},
+},
+],
+};
+--- Page 12 ---
+// Iniciar llamada
+export async function startCall(assistantId: string) {
+vapi.start(assistantId, {
+onCallStart: () => {
+console.log('Llamada iniciada');
+},
+onCallEnd: () => {
+console.log('Llamada finalizada');
+},
+onMessage: (message) => {
+console.log('Mensaje:', message);
+},
+onError: (error) => {
+console.error('Error:', error);
+},
+});
+}
+// Funciones que Vapi llamará
+export const functionHandlers = {
+checkAvailability: async (parameters: any) => {
+const response = await fetch('/api/calcom/availability', {
+method: 'POST',
+body: JSON.stringify(parameters),
+});
+return response.json();
+},
+createBooking: async (parameters: any) => {
+const response = await fetch('/api/calcom/bookings', {
+method: 'POST',
+body: JSON.stringify(parameters),
+});
+return response.json();
+},
+getRestaurantInfo: async () => {
+return {
+name: 'Mi Gran Parrilla',
+address: 'Calle 123 #45-67, Bogotá',
+hours: 'Lun-Dom: 12:00 PM - 11:00 PM',
+phone: '+57 300 123 4567',
+};
+},
+--- Page 13 ---
+transferToHuman: async (parameters: any) => {
+// Lógica para transferir a humano
+return { success: true };
+},
+};
+Webhook de Vapi:
+typescript
+// pages/api/webhooks/vapi.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+export default async function handler(
+req: NextApiRequest,
+res: NextApiResponse
+) {
+if (req.method !== 'POST') {
+return res.status(405).json({ error: 'Method not allowed'
+});
+}
+const event = req.body;
+// Evento: Llamada iniciada
+if (event.type === 'call.started') {
+await handleCallStarted(event.call);
+}
+// Evento: Llamada finalizada
+if (event.type === 'call.ended') {
+await handleCallEnded(event.call);
+}
+// Evento: Function call solicitada por el asistente
+if (event.type === 'function-call') {
+const { functionName, parameters, callId } = event;
+const result = await
+functionHandlers[functionName](parameters);
+// Enviar resultado de vuelta a Vapi
+await
+fetch(`https://api.vapi.ai/call/${callId}/function-response`,
+{
+method: 'POST',
+--- Page 14 ---
+headers: {
+'Authorization': `Bearer ${process.env.VAPI_API_KEY}`,
+'Content-Type': 'application/json',
+},
+body: JSON.stringify({ result }),
+});
+}
+// Evento: Transferencia a humano solicitada
+if (event.type === 'transfer-requested') {
+await handleTransferToHuman(event.call, event.reason);
+}
+res.status(200).json({ received: true });
+}
+Twilio Voice Configuration:
+typescript
+// pages/api/twilio/voice.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import twilio from 'twilio';
+const VoiceResponse = twilio.twiml.VoiceResponse;
+export default async function handler(
+req: NextApiRequest,
+res: NextApiResponse
+) {
+const twiml = new VoiceResponse();
+// Conectar con Vapi
+twiml.say('Conectando con el asistente virtual...');
+// Redirigir a Vapi
+twiml.redirect({
+method: 'POST',
+url:
+`https://api.vapi.ai/call/${process.env.VAPI_ASSISTANT_ID}`,
+});
+res.setHeader('Content-Type', 'text/xml');
+res.send(twiml.toString());
+}
+UI/UX:
+--- Page 15 ---
+● Indicador visual de "Llamada en curso" en el dashboard
+● Transcripción en tiempo real de la llamada
+● Botón "Tomar control" (transferir a humano)
+● Visualización de la conversación (qué dijo el cliente, qué respondió el bot)
+● Métricas: duración de llamada, estado, reserva creada (sí/no)
+SECCIÓN 3: CEREBRO DE IA (GPT-4O)
+REQUISITOS FUNCIONALES:
+SYSTEM PROMPTS:
+Crear prompts específicos para cada canal:
+1. WhatsApp/Chat:
+○ Más conciso (mensajes cortos)
+○ Emojis apropiados
+○ Formato amigable
+○ Soporta envío de imágenes/links
+2. Voz (Vapi):
+○ Más conversacional
+○ Frases más largas
+○ Sin emojis (no se pueden decir)
+○ Confirmaciones verbales
+3. Chat Web:
+○ Similar a WhatsApp
+○ Puede incluir botones/quick replies
+○ Soporta rich media
+CONTEXT MANAGEMENT:
+● Mantener contexto de la conversación (últimos 10 mensajes)
+● Recordar información del cliente (nombre, preferencias)
+● Acceder a historial de reservas del cliente
+● Persistir estado entre sesiones (Redis)
+FUNCTION CALLING:
+El LLM debe poder llamar estas funciones:
+1. checkAvailability(restaurantId, branchId, date, partySize)
+2. createBooking(restaurantId, branchId, date, time, partySize, customer)
+3. getCustomerHistory(customerPhone)
+4. getRestaurantInfo(restaurantId)
+5. sendConfirmationMessage(customerPhone, bookingDetails)
+--- Page 16 ---
+6. transferToHuman(reason)
+REQUISITOS TÉCNICOS:
+AI Handler:
+typescript
+// lib/ai-handlers/whatsapp.ts
+import OpenAI from 'openai';
+import { sendMessageToChatwoot } from '@/lib/chatwoot';
+import { checkAvailability, createBooking } from
+'@/lib/calcom';
+const openai = new OpenAI({
+apiKey: process.env.OPENAI_API_KEY,
+});
+const SYSTEM_PROMPT = `Eres un asistente virtual para reservas
+de restaurantes. Tu objetivo es ayudar a los clientes a hacer
+reservas de manera rápida y amable.
+INSTRUCCIONES:
+1. Saluda de manera cálida
+2. Pregunta: número de personas, fecha y hora preferida
+3. Verifica disponibilidad antes de confirmar
+4. Confirma todos los datos antes de crear la reserva
+5. Proporciona código de confirmación
+6. Ofrece ayuda adicional
+TONO:
+- Amable, profesional, cercano
+🙂
+- Usa emojis moderadamente
+- Sé conciso pero claro
+- Español neutro
+REGLAS:
+- Nunca inventes disponibilidad
+- Siempre confirma antes de crear reserva
+- Si no entiendes, pide clarificación
+- Si no puedes ayudar, ofrece transferir a humano`;
+export async function handleIncomingMessage(data: {
+conversationId: string;
+inboxId: string;
+contactId: string;
+--- Page 17 ---
+contactName: string;
+contactPhone: string;
+messageContent: string;
+channel: 'whatsapp' | 'web';
+}) {
+// Obtener historial de conversación (últimos 10 mensajes)
+const conversationHistory = await
+getConversationHistory(data.conversationId);
+// Obtener información del cliente
+const customer = await getOrCreateCustomer({
+name: data.contactName,
+phone: data.contactPhone,
+});
+// Obtener historial de reservas del cliente
+const bookingHistory = await
+getCustomerBookingHistory(customer.id);
+// Construir mensajes para GPT
+const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+{ role: 'system', content: SYSTEM_PROMPT },
+...conversationHistory,
+{ role: 'user', content: data.messageContent },
+];
+// Agregar contexto del cliente
+if (bookingHistory.length > 0) {
+messages.push({
+role: 'system',
+content: `Este cliente ha visitado el restaurante
+${bookingHistory.length} veces. Última visita:
+${bookingHistory[0].date}.`,
+});
+}
+// Llamar a GPT-4o con function calling
+const response = await openai.chat.completions.create({
+model: 'gpt-4o',
+messages,
+tools: [
+{
+type: 'function',
+function: {
+--- Page 18 ---
+name: 'checkAvailability',
+description: 'Verifica disponibilidad de mesas',
+parameters: {
+type: 'object',
+properties: {
+date: { type: 'string', description: 'Fecha
+YYYY-MM-DD' },
+time: { type: 'string', description: 'Hora
+HH:mm' },
+partySize: { type: 'number', description:
+'Número de personas' },
+},
+required: ['date', 'partySize'],
+},
+},
+},
+{
+type: 'function',
+function: {
+name: 'createBooking',
+description: 'Crea una reserva',
+parameters: {
+type: 'object',
+properties: {
+date: { type: 'string' },
+time: { type: 'string' },
+partySize: { type: 'number' },
+customerName: { type: 'string' },
+customerPhone: { type: 'string' },
+customerEmail: { type: 'string' },
+specialRequests: { type: 'string' },
+},
+required: ['date', 'time', 'partySize',
+'customerName', 'customerPhone'],
+},
+},
+},
+{
+type: 'function',
+function: {
+name: 'transferToHuman',
+description: 'Transfiere a un agente humano',
+parameters: {
+type: 'object',
+--- Page 19 ---
+properties: {
+reason: { type: 'string' },
+},
+required: ['reason'],
+},
+},
+},
+],
+tool_choice: 'auto',
+});
+const assistantMessage = response.choices[0].message;
+// Si el asistente quiere llamar una función
+if (assistantMessage.tool_calls) {
+for (const toolCall of assistantMessage.tool_calls) {
+const functionName = toolCall.function.name;
+const args = JSON.parse(toolCall.function.arguments);
+let result;
+if (functionName === 'checkAvailability') {
+result = await checkAvailability(args);
+} else if (functionName === 'createBooking') {
+result = await createBooking({
+...args,
+source: 'whatsapp',
+});
+// Enviar confirmación
+await sendConfirmationMessage(data.contactPhone,
+result);
+} else if (functionName === 'transferToHuman') {
+await transferToHuman(data.conversationId,
+args.reason);
+result = { success: true };
+}
+// Agregar resultado al contexto
+messages.push({
+role: 'tool',
+tool_call_id: toolCall.id,
+content: JSON.stringify(result),
+});
+--- Page 20 ---
+}
+// Obtener respuesta final del asistente
+const finalResponse = await
+openai.chat.completions.create({
+model: 'gpt-4o',
+messages,
+});
+const replyContent =
+finalResponse.choices[0].message.content;
+// Enviar respuesta a Chatwoot
+await sendMessageToChatwoot(
+data.inboxId,
+data.conversationId,
+replyContent!,
+'outgoing'
+);
+} else {
+// Respuesta directa sin function calling
+await sendMessageToChatwoot(
+data.inboxId,
+data.conversationId,
+assistantMessage.content!,
+'outgoing'
+);
+}
+// Guardar mensajes en historial
+await saveConversationHistory(data.conversationId, [
+{ role: 'user', content: data.messageContent },
+{ role: 'assistant', content: assistantMessage.content },
+]);
+}
+Context Management con Redis:
+typescript
+// lib/redis.ts
+import Redis from 'ioredis';
+const redis = new Redis(process.env.REDIS_URL!);
+export async function getConversationHistory(conversationId:
+string) {
+--- Page 21 ---
+const history = await
+redis.get(`conversation:${conversationId}:history`);
+return history ? JSON.parse(history) : [];
+}
+export async function saveConversationHistory(
+conversationId: string,
+messages: Array<{ role: string; content: string }>
+) {
+const key = `conversation:${conversationId}:history`;
+// Obtener historial existente
+const existing = await
+getConversationHistory(conversationId);
+// Agregar nuevos mensajes
+const updated = [...existing, ...messages].slice(-20); //
+Mantener últimos 20
+// Guardar con TTL de 24 horas
+await redis.setex(key, 86400, JSON.stringify(updated));
+}
+export async function clearConversationHistory(conversationId:
+string) {
+await redis.del(`conversation:${conversationId}:history`);
+}
+UI/UX:
+● Indicador de "IA escribiendo..." en el chat
+● Transcripción en tiempo real
+● Visualización de funciones llamadas (checkAvailability, createBooking)
+● Badge "Bot" vs "Humano" en mensajes
+● Opción "¿Fue útil esta respuesta?" (feedback)
+SECCIÓN 4: INTEGRACIÓN CON CAL.COM
+REQUISITOS FUNCIONALES:
+FUNCIONES NECESARIAS:
+1. checkAvailability:
+○ Consulta Cal.com API v2
+--- Page 22 ---
+○ Verifica disponibilidad para fecha/hora/personas
+○ Retorna slots disponibles
+2. createBooking:
+○ Crea reserva en Cal.com
+○ Agrega metadata (source: whatsapp/voice/web)
+○ Retorna confirmation code
+3. getEventTypes:
+○ Obtiene tipos de evento configurados
+○ Para mostrar opciones al cliente
+4. cancelBooking:
+○ Cancela reserva existente
+○ Procesa reembolso si aplica
+REQUISITOS TÉCNICOS:
+typescript
+// lib/calcom.ts
+import axios from 'axios';
+const CALCOM_API_URL = process.env.CALCOM_API_URL ||
+'https://app.cal.com';
+const CALCOM_API_KEY = process.env.CALCOM_API_KEY!;
+const headers = {
+'Authorization': `Bearer ${CALCOM_API_KEY}`,
+'Content-Type': 'application/json',
+};
+export async function checkAvailability({
+eventTypeId,
+date,
+partySize,
+}: {
+eventTypeId: number;
+date: string;
+partySize: number;
+}) {
+const startDate = `${date}T00:00:00Z`;
+const endDate = `${date}T23:59:59Z`;
+const response = await axios.get(
+`${CALCOM_API_URL}/api/v2/slots`,
+{
+headers,
+--- Page 23 ---
+params: {
+eventTypeId,
+startTime: startDate,
+endTime: endDate,
+},
+}
+);
+// Filtrar slots por capacidad
+const availableSlots = response.data.slots.filter(
+(slot: any) => slot.attendees < partySize
+);
+return {
+available: availableSlots.length > 0,
+slots: availableSlots.map((slot: any) => slot.time),
+};
+}
+export async function createBooking({
+eventTypeId,
+date,
+time,
+partySize,
+customerName,
+customerPhone,
+customerEmail,
+specialRequests,
+source,
+}: {
+eventTypeId: number;
+date: string;
+time: string;
+partySize: number;
+customerName: string;
+customerPhone: string;
+customerEmail?: string;
+specialRequests?: string;
+source: 'whatsapp' | 'voice' | 'web';
+}) {
+const start = `${date}T${time}:00`;
+const response = await axios.post(
+`${CALCOM_API_URL}/api/v2/bookings`,
+--- Page 24 ---
+{
+eventTypeId,
+start,
+responses: {
+name: customerName,
+email: customerEmail ||
+`${customerPhone}@reservations.local`,
+phone: customerPhone,
+partySize,
+notes: specialRequests,
+},
+metadata: {
+bookingSource: source,
+customerPhone,
+},
+language: 'es',
+timeZone: 'America/Bogota',
+},
+{ headers }
+);
+return {
+bookingId: response.data.id,
+confirmationCode: response.data.uid,
+status: response.data.status,
+};
+}
+export async function getEventTypes(restaurantId: string) {
+const response = await axios.get(
+`${CALCOM_API_URL}/api/v2/event-types`,
+{
+headers,
+params: { teamId: restaurantId },
+}
+);
+return response.data.eventTypes;
+}
+export async function cancelBooking(bookingId: string, reason:
+string) {
+const response = await axios.delete(
+`${CALCOM_API_URL}/api/v2/bookings/${bookingId}`,
+--- Page 25 ---
+{
+headers,
+data: { reason },
+}
+);
+return response.data;
+}
+SECCIÓN 5: DASHBOARD EN TIEMPO REAL
+REQUISITOS FUNCIONALES:
+VISTA DE CONVERSACIONES:
+● Lista de conversaciones activas
+● Indicador de canal (WhatsApp, Voz, Web)
+● Indicador de estado (Bot atendiendo / Humano atendiendo)
+● Preview del último mensaje
+● Timestamp
+● Badge de no leídos
+DETALLE DE CONVERSACIÓN:
+● Transcripción completa
+● Indicador de quién habla (Bot/Cliente/Humano)
+● Timestamp de cada mensaje
+● Funciones llamadas por el bot (checkAvailability, createBooking)
+● Resultado de funciones
+● Reserva creada (si aplica)
+CONTROLES:
+● Botón "Tomar control" (transferir bot → humano)
+● Botón "Transferir a bot" (humano → bot)
+● Input para escribir mensaje manual
+● Respuestas rápidas predefinidas
+● Botón "Marcar como resuelta"
+ESTADÍSTICAS:
+● Conversaciones totales (hoy/semana/mes)
+● Por canal (WhatsApp, Voz, Web)
+● Tasa de resolución del bot (%)
+● Tiempo promedio de respuesta
+● Reservas generadas por IA
+--- Page 26 ---
+● Transferencias a humano (%)
+REQUISITOS TÉCNICOS:
+typescript
+// components/ConversationsDashboard.tsx
+import { useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+export default function ConversationsDashboard() {
+const [conversations, setConversations] =
+useState<Conversation[]>([]);
+const [selectedConversation, setSelectedConversation] =
+useState<string | null>(null);
+const [socket, setSocket] = useState<Socket | null>(null);
+useEffect(() => {
+// Conectar a WebSocket
+const newSocket = io(process.env.NEXT_PUBLIC_WS_URL!);
+setSocket(newSocket);
+// Suscribirse a nuevas conversaciones
+newSocket.on('new-conversation', (conversation:
+Conversation) => {
+setConversations(prev => [conversation, ...prev]);
+});
+// Suscribirse a nuevos mensajes
+newSocket.on('new-message', (message: Message) => {
+setConversations(prev =>
+prev.map(conv =>
+conv.id === message.conversationId
+? { ...conv, lastMessage: message, updatedAt:
+message.createdAt }
+: conv
+)
+);
+});
+// Suscribirse a transferencias
+newSocket.on('conversation-transferred', (data: {
+conversationId: string, to: 'bot' | 'human' }) => {
+setConversations(prev =>
+prev.map(conv =>
+--- Page 27 ---
+conv.id === data.conversationId
+? { ...conv, assignedTo: data.to }
+: conv
+)
+);
+});
+return () => {
+newSocket.disconnect();
+};
+}, []);
+return (
+<div className="flex h-screen">
+{/* Lista de conversaciones */}
+<div className="w-1/3 border-r">
+<ConversationsList
+conversations={conversations}
+selectedId={selectedConversation}
+onSelect={setSelectedConversation}
+/>
+</div>
+{/* Detalle de conversación */}
+<div className="flex-1">
+{selectedConversation ? (
+<ConversationDetail
+conversationId={selectedConversation}
+socket={socket}
+/>
+) : (
+<div className="flex items-center justify-center
+h-full text-gray-500">
+Selecciona una conversación
+</div>
+)}
+</div>
+</div>
+);
+}
+UI/UX:
+● Diseño tipo WhatsApp Web / Intercom
+● Notificaciones toast cuando llega mensaje nuevo
+--- Page 28 ---
+● Sonido de notificación (opcional)
+● Badges de no leídos
+● Búsqueda de conversaciones
+● Filtros por canal y estado
+● Responsive (móvil: una pantalla a la vez)
+SECCIÓN 6: ESTADÍSTICAS Y ANALYTICS
+REQUISITOS FUNCIONALES:
+MÉTRICAS PRINCIPALES:
+1. Volumen:
+○ Total de conversaciones (día/semana/mes)
+○ Por canal (WhatsApp, Voz, Web)
+○ Conversaciones activas ahora
+2. Rendimiento del Bot:
+○ Tasa de resolución automática (%)
+○ Conversaciones transferidas a humano (%)
+○ Tiempo promedio de respuesta del bot
+○ Satisfacción del cliente (rating)
+3. Reservas:
+○ Reservas generadas por IA
+○ Por canal (WhatsApp vs Voz vs Web)
+○ Tasa de conversión (conversación → reserva)
+○ Ingresos estimados
+4. Llamadas (Voz):
+○ Total de llamadas
+○ Duración promedio
+○ Tasa de abandono
+○ Calidad de audio (MOS score)
+5. WhatsApp:
+○ Mensajes enviados/recibidos
+○ Tiempo de respuesta promedio
+○ Tasa de apertura
+GRÁFICOS:
+● Conversaciones por día (línea)
+● Distribución por canal (donut)
+● Reservas generadas por canal (barras)
+● Tasa de resolución del bot (gauge)
+● Duración de llamadas (histograma)
+--- Page 29 ---
+REQUISITOS TÉCNICOS:
+typescript
+// pages/api/analytics/conversations.ts
+export default async function handler(
+req: NextApiRequest,
+res: NextApiResponse
+) {
+const { startDate, endDate } = req.query;
+const stats = await prisma.$queryRaw`
+SELECT
+COUNT(*) as totalConversations,
+COUNT(CASE WHEN assignedTo = 'bot' THEN 1 END) as
+botHandled,
+COUNT(CASE WHEN assignedTo = 'human' THEN 1 END) as
+humanHandled,
+AVG(EXTRACT(EPOCH FROM (lastMessageAt - createdAt))) as
+avgResponseTime,
+COUNT(CASE WHEN status = 'resolved' THEN 1 END) as
+resolvedCount
+FROM conversations
+WHERE "restaurantId" = ${req.query.restaurantId}
+AND createdAt >= ${startDate}
+AND createdAt <= ${endDate}
+`;
+const bookingsBySource = await prisma.booking.groupBy({
+by: ['source'],
+_count: true,
+where: {
+restaurantId: req.query.restaurantId,
+createdAt: {
+gte: new Date(startDate as string),
+lte: new Date(endDate as string),
+},
+},
+});
+res.json({
+stats,
+bookingsBySource,
+});
+}
+--- Page 30 ---
+UI/UX:
+● Dashboard con cards de KPIs
+● Gráficos interactivos (Recharts)
+● Filtros de fecha
+● Exportación a PDF/Excel
+● Actualización en tiempo real
+RESUMEN DE ENTREGABLES ESPERADOS
+Después de implementar este módulo, debes tener:
+✅ Chatwoot:
+● Configurado con WhatsApp (Twilio)
+● Configurado con chat web
+● Webhooks funcionando
+● API integration completa
+✅ Vapi.ai:
+● Assistant configurado con GPT-4o
+● Funciones de checkAvailability y createBooking
+● Integración con Twilio Voice
+● Webhooks funcionando
+✅ IA/Backend:
+● GPT-4o con function calling
+● Context management con Redis
+● Handlers para WhatsApp y voz
+● Integración con Cal.com
+✅ Dashboard:
+● Lista de conversaciones en tiempo real
+● Detalle de conversación
+● Controles de transferencia (bot ↔ humano)
+● Estadísticas y analytics
+✅ Cal.com Integration:
+● checkAvailability
+● createBooking
+● cancelBooking
+--- Page 31 ---
+● Metadata de origen (whatsapp/voice/web)
+✅ Real-time:
+● WebSocket para actualizaciones
+● Notificaciones push
+● Transcripción en vivo
+✅ Analytics:
+● Métricas de conversaciones
+● Métricas de reservas
+● Métricas de rendimiento del bot
+● Gráficos y exportación
+INSTRUCCIONES PARA ANTIGRAVITY
+1. Configura Chatwoot (self-hosted o cloud)
+2. Configura Twilio (WhatsApp + Voice)
+3. Configura Vapi.ai (assistant, functions, webhook)
+4. Implementa backend (Next.js API routes para webhooks)
+5. Implementa IA handlers (GPT-4o con function calling)
+6. Integra con Cal.com (availability, bookings)
+7. Construye dashboard (conversaciones, real-time)
+8. Agrega analytics (métricas, gráficos)
+9. Testing (WhatsApp, llamadas, chat web)
+10. Optimización (performance, errores)
+Prioridad:
+1. Chatwoot + WhatsApp básico
+2. GPT-4o integration
+3. Cal.com integration
+4. Vapi.ai (voz)
+5. Dashboard en tiempo real
+6. Analytics
+Nota: Cada canal (WhatsApp, voz, web) debe funcionar independientemente pero
+compartir el mismo cerebro de IA y crear reservas en el mismo calendario de
+Cal.com.
+
+================================================================================
+FILE: agendamiento modulo 5.pdf
+================================================================================
+
+--- Page 1 ---
+PROMPT TÉCNICO PARA ANTIGRAVITY - MÓDULO 5:
+API, WEBHOOKS E INTEGRACIONES
+markdown
+# CONTEXTO DEL MÓDULO 5
+Estás construyendo la **CAPA DE INTEGRACIÓN Y API PÚBLICA** de
+la plataforma SaaS de reservas.
+Este módulo permite que sistemas externos (POS, Google Maps,
+Zapier) se conecten con nuestra plataforma.
+Incluye una API RESTful segura, un sistema de Webhooks
+robusto, documentación interactiva y conectores nativos.
+STACK TECNOLÓGICO:
+- Backend: Next.js API Routes / Edge Functions
+- Documentación: NextSwagger o tRPC / OpenAPI 3.0
+- Cache & Rate Limiting: Upstash Redis
+- Base de Datos: PostgreSQL (Prisma ORM)
+- Webhooks: Svix (opcional) o lógica custom con intentos y
+firmas (HMAC)
+- SDK: Generación automática para JS/Python
+- Integraciones: Google Reserve API, Zapier CLI
+---
+## ARQUITECTURA DE SEGURIDAD
+### REQUISITOS FUNCIONALES:
+1. **Autenticación de API:**
+- Cada restaurante tiene un `API_KEY` (Prefijo:
+`res_live_...` o `res_test_...`).
+- Autenticación vía Header: `Authorization: Bearer
+<API_KEY>`.
+- Opción de generar múltiples claves con permisos
+específicos (solo lectura, solo escritura).
+2. **Rate Limiting (Límites de Uso):**
+- Proteger contra abusos (DDoS, scraping).
+- Límites por plan:
+* Free: 100 requests/hora
+* Pro: 1,000 requests/hora
+* Enterprise: Ilimitado
+--- Page 2 ---
+- Headers de respuesta: `X-RateLimit-Limit`,
+`X-RateLimit-Remaining`, `X-RateLimit-Reset`.
+3. **Validación de Firmas (Webhooks):**
+- Firmas HMAC-SHA256 para asegurar que el webhook viene de
+nuestra plataforma.
+- Header: `X-Webhook-Signature`.
+### REQUISITOS TÉCNICOS:
+**Middleware de Autenticación:**
+```typescript
+// middleware/api-auth.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { ratelimit } from '@/lib/redis'; // Upstash
+configuration
+export async function middleware(request: NextRequest) {
+// Excluir rutas públicas y documentación
+if (request.nextUrl.pathname.startsWith('/api/docs') ||
+request.nextUrl.pathname.startsWith('/public')) {
+return NextResponse.next();
+}
+const apiKey =
+request.headers.get('authorization')?.replace('Bearer ', '');
+if (!apiKey) {
+return NextResponse.json({ error: 'API Key requerida' }, {
+status: 401 });
+}
+// Validar API Key en DB
+const keyRecord = await prisma.apiKey.findUnique({
+where: { key: apiKey },
+include: { restaurant: true }
+});
+if (!keyRecord || !keyRecord.isActive) {
+return NextResponse.json({ error: 'API Key inválida' }, {
+status: 403 });
+--- Page 3 ---
+}
+// Rate Limiting
+const ip = request.ip || '127.0.0.1';
+const { success, limit, reset, remaining } = await
+ratelimit.limit(ip);
+if (!success) {
+return NextResponse.json({ error: 'Límite de requests
+excedido' }, { status: 429 });
+}
+// Pasar datos al request
+request.headers.set('x-restaurant-id',
+keyRecord.restaurantId);
+const response = NextResponse.next();
+response.headers.set('X-RateLimit-Limit', limit.toString());
+response.headers.set('X-RateLimit-Remaining',
+remaining.toString());
+response.headers.set('X-RateLimit-Reset', reset.toString());
+return response;
+}
+export const config = {
+matcher: '/api/v1/:path*',
+};
+SECCIÓN 1: API PÚBLICA (REST)
+REQUISITOS FUNCIONALES:
+Exponer endpoints para que terceros manipulen datos del restaurante.
+Endpoints Principales:
+1. Reservas (Bookings):
+○ GET /api/v1/bookings: Listar reservas (filtros: fecha, estado).
+○ POST /api/v1/bookings: Crear reserva desde un sistema externo
+(ej. llamada entrante al POS).
+○ PUT /api/v1/bookings/:id: Actualizar estado (Check-in,
+No-show, Cancelado).
+○ DELETE /api/v1/bookings/:id: Cancelar reserva.
+2. Disponibilidad (Availability):
+--- Page 4 ---
+○ GET /api/v1/availability: Consultar slots libres (para mostrar
+en app del restaurante o Google Maps).
+3. Mesas (Tables):
+○ GET /api/v1/tables: Listar configuración de mesas.
+○ PUT /api/v1/tables/:id: Cambiar estado de una mesa
+(Ocupada/Libre).
+4. Clientes (Customers):
+○ GET /api/v1/customers: Buscar clientes (por teléfono/email).
+○ POST /api/v1/customers: Registrar nuevo cliente (CRM Sync).
+Formato de Respuesta Estándar:
+json
+{
+"success": true,
+"data": { ... },
+"meta": {
+"page": 1,
+"total": 100
+}
+}
+REQUISITOS TÉCNICOS:
+Implementación con Zod y Next.js:
+typescript
+// app/api/v1/bookings/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { createBookingSchema } from '@/lib/validations';
+import { createBookingService } from '@/services/booking';
+export async function POST(req: NextRequest) {
+try {
+const body = await req.json();
+// Validar payload
+const validatedData = createBookingSchema.parse(body);
+const restaurantId = req.headers.get('x-restaurant-id');
+// Lógica de negocio
+const booking = await createBookingService({
+...validatedData,
+restaurantId,
+source: 'api', // Marca que vino por API
+--- Page 5 ---
+});
+return NextResponse.json({ success: true, data: booking },
+{ status: 201 });
+} catch (error) {
+if (error instanceof z.ZodError) {
+return NextResponse.json({ error: 'Datos inválidos',
+details: error.errors }, { status: 400 });
+}
+return NextResponse.json({ error: 'Error interno' }, {
+status: 500 });
+}
+}
+SECCIÓN 2: SISTEMA DE WEBHOOKS
+REQUISITOS FUNCIONALES:
+Sistema para notificar a sistemas externos cuando ocurren eventos importantes.
+Eventos Disponibles:
+1. booking.created: Nueva reserva confirmada.
+2. booking.updated: Se modificó una reserva.
+3. booking.cancelled: Reserva cancelada.
+4. booking.no_show: Cliente no asistió.
+5. booking.checkin: Cliente llegó.
+6. table.status_changed: Mesa cambió de estado.
+Panel de Configuración de Webhooks (UI):
+● Campo URL: https://mi-restaurante.com/webhook
+● Checkboxes para seleccionar eventos (ej: "Solo avisar si se cancela").
+● Secret de firma: Generado automáticamente para verificar la autenticidad.
+● Historial de entregas (Logs): Ver si el webhook fue enviado y la respuesta del
+servidor destino.
+● Botón "Reenviar" (Retry) en caso de fallo.
+Entrega Robusta:
+● Retries automáticos con Backoff Exponencial (si falla la primera, intenta a los
+5 min, luego 30 min, luego 4 horas).
+● Timeout de 30 segundos.
+REQUISITOS TÉCNICOS:
+--- Page 6 ---
+Lógica de Webhooks:
+t
+typescript
+// lib/webhooks.ts
+import crypto from 'crypto';
+import axios from 'axios';
+export async function triggerWebhook(event: string, payload:
+any, webhookId: string) {
+const webhook = await prisma.webhook.findUnique({ where: {
+id: webhookId } });
+if (!webhook) return;
+// Verificar si el evento está suscrito
+if (!webhook.events.includes(event)) return;
+const body = JSON.stringify({
+id: crypto.randomUUID(),
+event,
+timestamp: new Date().toISOString(),
+data: payload,
+});
+// Firma HMAC
+const signature = crypto.createHmac('sha256',
+webhook.secret).update(body).digest('hex');
+try {
+await axios.post(webhook.url, body, {
+headers: {
+'Content-Type': 'application/json',
+'X-Webhook-Signature': signature,
+'User-Agent': 'TuPlataforma-Webhook/1.0',
+},
+timeout: 30000,
+});
+// Registrar éxito
+await logWebhookDelivery(webhookId, 'success');
+} catch (error) {
+// Registrar error y programar reintento
+await logWebhookDelivery(webhookId, 'failed',
+error.message);
+// Aquí llamarías a una cola (Queue) para reintentar
+--- Page 7 ---
+}
+}
+Endpoint para Recibir Webhooks (ej. de Zapier a nosotros):
+typescript
+// app/api/webhooks/incoming/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+export async function POST(req: NextRequest) {
+// Ejemplo: Recibir evento desde un POS externo (Vendty)
+const signature = req.headers.get('x-pos-signature');
+const body = await req.text();
+// Verificar firma del POS
+const isValid = verifySignature(body, signature,
+process.env.POS_SECRET);
+if (!isValid) {
+return NextResponse.json({ error: 'Firma inválida' }, {
+status: 401 });
+}
+const data = JSON.parse(body);
+// Procesar evento (ej. actualizar estado de mesa si el POS
+dice que pagaron)
+if (data.event === 'bill_paid') {
+await handleBillPaid(data.tableNumber);
+}
+return NextResponse.json({ received: true }, { status: 200
+});
+}
+SECCIÓN 3: INTEGRACIONES NATIVAS
+REQUISITOS FUNCIONALES:
+Conectores "Plug & Play" para servicios populares.
+1. Google Reserve (Google Maps):
+○ Sincronizar disponibilidad y reservas directamente con Google Maps.
+○ El usuario ve "Reservar" en Google Maps y cae en nuestro sistema (o
+se sincroniza).
+○ Requiere validación de Google (Google Business Profile API).
+--- Page 8 ---
+2. Zapier / Make:
+○ Crear un "Zap" que dispare acciones.
+○ Trigger: "Nueva Reserva".
+○ Action: "Crear Cliente en Mailchimp", "Enviar Mensaje a Slack",
+"Agregar a Google Sheets".
+3. POS (Puntos de Venta):
+○ Vendty / SoftRestaurant: Integración para enviar reservas al POS y
+que aparezcan como órdenes anticipadas.
+○ Mapeo de campos (Nombre cliente -> Orden POS).
+4. Slack / Discord:
+○ Notificar al canal del equipo cuando hay una reserva VIP o un evento
+grande.
+REQUISITOS TÉCNICOS:
+Integración con Slack (Ejemplo):
+typescript
+// services/integrations/slack.ts
+export async function sendSlackNotification(webhookUrl:
+string, message: string) {
+await axios.post(webhookUrl, {
+text: message,
+blocks: [
+{
+type: 'section',
+text: {
+type: 'mrkdwn',
+text: ` *Nueva Reserva VIP*\n${message}`
+}
+}
+]
+});
+}
+SECCIÓN 4: DOCUMENTACIÓN Y SDK
+REQUISITOS FUNCIONALES:
+Experiencia para desarrolladores (DevEx).
+1. Swagger / OpenAPI UI:
+○ Página en tudominio.com/api/docs.
+○ Documentación interactiva: Puedes probar los endpoints desde el
+navegador.
+--- Page 9 ---
+○ Autenticación directa en el UI (input para pegar el API Key).
+○ Esquemas de JSON claros.
+2. SDKs (Software Development Kits):
+○ Generar librerías para facilitar la integración.
+○ Node.js SDK: npm install @tu-plataforma/sdk
+○ Python SDK: pip install tu-plataforma
+○ Ejemplos de uso en el README.
+3. Sandbox / Playground:
+○ Permitir a los desarrolladores probar sin afectar datos reales.
+REQUISITOS TÉCNICOS:
+Swagger con next-swagger-doc:
+typescript
+// app/api/docs/page.tsx
+import { getApiDocs } from '@/lib/swagger';
+import ReactSwagger from '@/components/react-swagger';
+export default async function IndexPage() {
+const spec = await getApiDocs();
+return <ReactSwagger spec={spec} />;
+}
+Ejemplo de Node.js SDK:
+typescript
+// sdk/src/client.ts
+export class Client {
+private apiKey: string;
+private baseUrl: string;
+constructor(apiKey: string, baseUrl =
+'https://api.tu-plataforma.com/v1') {
+this.apiKey = apiKey;
+this.baseUrl = baseUrl;
+}
+async createBooking(bookingData: BookingPayload) {
+const response = await fetch(`${this.baseUrl}/bookings`, {
+method: 'POST',
+headers: {
+'Authorization': `Bearer ${this.apiKey}`,
+'Content-Type': 'application/json',
+},
+body: JSON.stringify(bookingData),
+});
+return response.json();
+--- Page 10 ---
+}
+}
+SECCIÓN 5: DASHBOARD DE INTEGRACIONES (UI)
+REQUISITOS FUNCIONALES:
+Interfaz para que el restaurante gestione sus conexiones.
+Pestañas:
+1. API Keys:
+○ Crear/Nombrar claves (ej. "Clave para el
+desarrollador de la web").
+○ Copiar clave.
+○ Revocar claves.
+2. Webhooks:
+○ Lista de URLs suscritas.
+○ Estado (Activo/Error).
+○ Log de eventos recientes (éxito/fallo).
+○ Botón "Agregar Webhook".
+3. Integraciones:
+○ Grid de apps (Google, Slack, Zapier, POS).
+○ Estado de conexión (Conectado/Desconectado).
+○ Botón "Configurar".
+REQUISITOS TÉCNICOS:
+Componentes UI:
+● ApiKeyManager.tsx: Tabla de claves con modal de creación.
+● WebhookLogs.tsx: Tabla de logs con filtros por estado y
+fecha.
+● IntegrationCard.tsx: Card visual con logo del servicio y
+toggle de conexión.
+RESUMEN DE ENTREGABLES ESPERADOS
+Después de implementar este módulo, debes tener:
+✅
+API Pública REST:
+● Endpoints seguros para Reservas, Mesas y Clientes.
+● Autenticación por API Key y Rate Limiting.
+● Validación estricta con Zod.
+--- Page 11 ---
+✅
+Sistema de Webhooks:
+● Creación y gestión de endpoints externos.
+● Firmas de seguridad (HMAC).
+● Historial de entregas y reintentos automáticos.
+✅
+Integraciones:
+● Google Reserve (sincronización básica).
+● Zapier (Triggers configurables).
+● Slack (Notificaciones).
+● Preparación para POS (APIs de entrada).
+✅
+Documentación:
+● Swagger UI interactivo y funcional.
+● SDK básico en Node.js.
+● Guías de inicio rápido.
+✅
+Dashboard de Desarrollador:
+● Gestión de claves y webhooks.
+● Monitoreo de actividad.
+● Logs de errores.
+INSTRUCCIONES PARA ANTIGRAVITY
+1. Implementa el Middleware de API (Auth + Rate Limiting).
+2. Crea los Endpoints REST (Bookings, Availability).
+3. Desarrolla el servicio de Webhooks (Envío, Firmas, Logs
+en DB).
+4. Construye la UI de configuración (Dashboard >
+Configuración > Integraciones).
+5. Instala y configura Swagger para la documentación
+automática.
+6. Implementa la integración con Slack y Zapier como
+ejemplos iniciales.
+7. Genera el SDK básico en Node.js.
+Prioridad:
+1. API Segura y Rate Limiting (Fundamental).
+2. Webhooks (Necesario para notificaciones externas).
+--- Page 12 ---
+3. Documentación Swagger (Para que otros usen la API).
+4. Integraciones específicas (Slack, Zapier).
+Nota: La seguridad es crítica aquí. Nunca expongas claves
+secretas en el frontend y asegúrate de que cada request a la
+API esté validado contra el restaurante correspondiente.
+¿Listo para finalizar el desarrollo con este módulo? Empieza
+🚀
+por el Middleware y la estructura de la API.
+
+================================================================================
+FILE: correciones_Modulo1_Documentacion.docx
+================================================================================
+ANTIGRAVITY PLATFORM
+MÓDULO 1: ONBOARDING SELF-SERVICE
+Documento Técnico de Arquitectura, Decisiones e Implementación
+
+Versión 1.0  •  Junio 2026  •  Plataforma SaaS de Reservas para Restaurantes
+
+📋 Resumen Ejecutivo
+Antigravity es una plataforma SaaS de reservas para restaurantes construida sobre Next.js 14, Cal.com self-hosted y una arquitectura moderna orientada a microservicios. Este documento cubre el Módulo 1: el sistema de onboarding self-service que permite a los restaurantes configurarse de forma autónoma en menos de 15 minutos.
+El módulo incluye 10 características core: wizard de 5 pasos, editor drag & drop, subida de imágenes, selector de colores, plantillas pre-diseñadas, preview en tiempo real, importación desde Google Business, generador de QR, dominio personalizado y widget embebible.
+La recomendación clave de este documento es incorporar desde el inicio una capa de Agentes de IA — integrada con WhatsApp Business API — que transforme la plataforma en un sistema conversacional capaz de gestionar reservas, recordatorios y soporte sin intervención humana.
+
+
+🗺️ Contenido del Documento
+1. Arquitectura General del Sistema
+2. Stack Tecnológico Recomendado (con justificaciones)
+3. Módulo 1: Wizard de 5 Pasos
+4. Características Avanzadas (Editor, Imágenes, Colores, QR, etc.)
+5. Agente de IA + WhatsApp Business API (Nuevo)
+6. Arquitectura de Base de Datos
+7. Seguridad, Performance y Monitoreo
+8. Roadmap de Implementación
+9. Checklist de Calidad
+10. Recomendaciones Finales
+
+1. Arquitectura General del Sistema
+1.1 Diagrama de Capas
+
+1.2 Flujo Principal de Onboarding
+
+
+2. Stack Tecnológico Recomendado
+2.1 Cambios y Justificaciones vs. Propuesta Original
+El PDF original propone un buen stack base. Se realizan los siguientes ajustes y adiciones para maximizar velocidad, DX (Developer Experience) y capacidad de IA:
+
+
+2.2 Dependencias Exactas package.json
+
+
+3. Wizard de 5 Pasos: Implementación Detallada
+3.1 Arquitectura del Estado del Wizard
+El wizard utiliza Zustand para estado global con persistencia en localStorage (borrador local) y sincronización con la API cada 30 segundos. Cada paso tiene su propio schema Zod para validación independiente.
+
+3.2 Paso 1: Información Básica
+Campos requeridos y opcionales con validación Zod. La dirección usa Google Places Autocomplete. El teléfono usa react-phone-number-input para soporte internacional.
+
+3.3 Paso 2: Horarios de Atención
+El componente más complejo del wizard. Soporta múltiples turnos por día (almuerzo + cena) y herencia de horarios (copiar de otro día).
+
+3.4 Paso 3: Capacidad y Mesas
+La configuración de mesas alimenta directamente el motor de disponibilidad de Cal.com. Cada tipo de mesa se convierte en un "Event Type" en Cal.com con su capacidad configurada.
+
+3.5 Paso 4: Configuración de Pagos
+Integrar Wompi como pasarela principal para el mercado colombiano. Stripe como secundaria para mercado internacional. Los webhooks de pago deben procesarse en /api/webhooks/[gateway].
+
+
+4. Características Avanzadas
+4.1 Editor Drag & Drop
+Usar @dnd-kit exclusivamente. Implementar con DndContext + SortableContext. El estado de la UI se guarda en el campo layout (JSON) en la tabla Restaurant.
+
+4.2 Subida de Imágenes
+UploadThing es la elección correcta para Next.js. Configurar los siguientes FileRouters:
+
+Para el crop editor, usar react-easy-crop con getCroppedImg utility. La compresión automática se hace en el browser con browser-image-compression antes del upload (ahorra ancho de banda y tiempo).
+
+4.3 Selector de Colores con Eyedropper
+La función de extracción de colores desde URL requiere un servidor proxy para evitar CORS. Implementar en /api/colors/extract usando node-fetch + colorthief en el servidor.
+
+4.4 Generador de QR
+Usar qrcode.react para renderizado en cliente. Para descargas en alta resolución y PDF, generar en servidor con node-qrcode + jsPDF.
+
+4.5 Dominio Personalizado
+
+
+5. 🤖 Agente de IA + WhatsApp Business API
+
+5.1 Arquitectura del Agente
+
+5.2 Flujo de una Reserva por WhatsApp
+Cliente envía "Hola, quiero reservar una mesa para 4 personas este sábado".
+WhatsApp API hace POST al webhook /api/webhooks/whatsapp.
+El sistema identifica el restaurante por el número de WhatsApp Business.
+Se recupera el historial de conversación de Redis (si existe).
+GPT-4o con system prompt del restaurante procesa el mensaje.
+El agente llama a check_availability(date, party_size) → consulta Cal.com API.
+GPT-4o responde con opciones de horario disponibles.
+Cliente selecciona horario → agente llama a create_reservation().
+Se crea reserva en Cal.com. Se guarda en PostgreSQL. Se envía email de confirmación.
+WhatsApp responde: "Tu reserva está confirmada para el sábado 21 de junio a las 8pm..."
+
+5.3 System Prompt Dinámico
+Cada restaurante tiene su propio system prompt generado dinámicamente desde su configuración. Esto garantiza que el agente hable en el "tono" del restaurante.
+
+5.4 Configuración en el Onboarding (Paso 6 Opcional)
+Agregar un Paso 6 opcional en el wizard exclusivamente para configurar el agente de WhatsApp. Esto es un diferenciador de plan (Free vs Pro vs Business).
+
+5.5 Campos Adicionales en BD para Agente
+
+
+6. Arquitectura de Base de Datos
+6.1 Optimizaciones al Schema Original
+El schema del PDF original es sólido. Se agregan los siguientes índices y mejoras para performance:
+
+6.2 Tabla de Reservas (faltaba en el documento original)
+
+6.3 Estrategia de Migrations
+Usar npx prisma migrate dev --name init en desarrollo.
+En producción: npx prisma migrate deploy (NO usar migrate dev).
+Backups automáticos diarios en Neon (incluidos en plan gratuito).
+Usar prisma db seed para datos de prueba (restaurante demo).
+Nunca editar manualmente la base de datos de producción.
+
+
+7. Seguridad, Performance y Monitoreo
+7.1 Seguridad
+
+7.2 Performance
+
+7.3 Monitoreo y Observabilidad
+
+
+8. Roadmap de Implementación
+8.1 Fase 1: MVP (Semanas 1-3)
+
+8.2 Fase 2: Personalización (Semanas 4-6)
+
+8.3 Fase 3: IA y WhatsApp (Semanas 7-9)
+
+
+9. Checklist de Calidad por Característica
+9.1 Wizard de 5 Pasos
+[ ] Todos los campos tienen validación Zod con mensajes en español
+[ ] Auto-guardado funciona correctamente (verificar con Network tab)
+[ ] El botón "Siguiente" está deshabilitado si el paso actual tiene errores
+[ ] La navegación hacia atrás NO pierde datos ingresados
+[ ] El wizard recupera el progreso al recargar la página
+[ ] Funciona correctamente en móvil (probado en Chrome DevTools)
+[ ] Los campos de contraseña de pasarelas nunca se muestran en plain text
+[ ] Al publicar, se crea el calendario en Cal.com exitosamente
+
+9.2 Editor Drag & Drop
+[ ] Las secciones se reordenan correctamente y el orden persiste al guardar
+[ ] Undo/Redo funciona (Ctrl+Z y Ctrl+Y)
+[ ] El formulario de reservas no puede ocultarse
+[ ] El editor funciona en touch (móvil y tablet)
+
+9.3 Agente WhatsApp
+[ ] El webhook verifica la firma X-Hub-Signature-256 de Meta
+[ ] El agente responde en < 3 segundos (medir p99)
+[ ] El agente no inventa disponibilidad (probado con fechas sin disponibilidad)
+[ ] El historial de conversación se limpia después de 24 horas (TTL Redis)
+[ ] El escalado a humano funciona cuando se solicita hablar con una persona
+[ ] Se envía email de confirmación al crear reserva por WhatsApp
+
+
+10. Recomendaciones Finales
+10.1 Lo más Importante: Prioridades
+
+10.2 Errores Comunes a Evitar
+
+10.3 Variables de Entorno Requeridas
+
+
+Documento generado para el Módulo 1 de Antigravity — Junio 2026
+Subir Módulos 2-5 para continuar con la documentación del sistema completo.
+
+
+================================================================================
+FILE: correciones_Modulo2_Documentacion.docx
+================================================================================
+ANTIGRAVITY PLATFORM
+MÓDULO 2: SISTEMA DE RESERVAS
+Frontend Público del Cliente — Documento Técnico Completo
+
+Versión 1.0  •  Junio 2026  •  Basado en Módulo 1 (Onboarding Self-Service)
+
+📋 Resumen Ejecutivo
+El Módulo 2 de Antigravity es la cara visible del sistema: la página pública donde los clientes finales realizan sus reservas. Es el módulo de mayor impacto en la experiencia del usuario y el que determina directamente la tasa de conversión del restaurante.
+Este módulo implementa un flujo de 6 pasos (Sede → Personas → Fecha/Hora → Datos → Pago → Confirmación) completamente integrado con Cal.com como backend de disponibilidad y las pasarelas de pago configuradas en el Módulo 1.
+
+
+
+🗺️ Contenido
+1. Arquitectura del Flujo y Estado Global
+2. Paso 0: Selección de Sede
+3. Paso 1: Número de Personas y Tipo de Evento
+4. Paso 2: Calendario y Horarios Disponibles
+5. Paso 3: Datos del Cliente (Guest-First)
+6. Paso 4: Confirmación y Pago
+7. Paso 5: Éxito y QR de Confirmación
+8. Integración Completa con Cal.com
+9. Notificaciones: Email, WhatsApp y Recordatorios
+10. Performance, Accesibilidad y Testing
+11. Decisiones de Arquitectura y Recomendaciones
+
+1. Arquitectura del Flujo y Estado Global
+1.1 Diagrama de Flujo Completo
+
+1.2 Estado Global con Zustand
+El estado de toda la reserva vive en un Zustand store. Se persiste en sessionStorage (NO localStorage) para que sobreviva refreshes accidentales pero se limpie al cerrar la pestaña.
+
+1.3 Routing entre Pasos
+Usar Next.js App Router con URL params para que cada paso tenga su propia URL. Esto permite compartir un paso específico y que el botón "Atrás" del navegador funcione correctamente.
+
+
+2. Paso 0: Selección de Sede
+2.1 Lógica de Navegación
+
+2.2 Componentes y Props
+
+2.3 API y Caché
+La lista de sedes se carga UNA vez y se cachea. La disponibilidad de hoy se carga para todas las sedes en paralelo con Promise.all().
+
+
+3. Paso 1: Número de Personas y Tipo de Evento
+3.1 Selector de Personas: UX Optimizada
+El selector visual de personas es el primer elemento interactivo del flujo. Debe ser inmediato, táctil y sin ambigüedad.
+
+3.2 Tipo de Evento: Cards con Iconos
+Las cards de tipo de evento usan iconos SVG inline (no dependencias externas) para velocidad. Son opcionales: el usuario puede saltar este paso.
+
+3.3 Solicitudes Especiales: Chips Inteligentes
+Los chips de sugerencias rápidas reducen la fricción. Al hacer click en un chip, se agrega el texto al textarea (no lo reemplaza, lo concatena con separador).
+
+
+4. Paso 2: Calendario y Horarios Disponibles
+4.1 Arquitectura del Componente Principal
+Este es el paso más complejo técnicamente. Requiere comunicación en tiempo real con Cal.com y una UX que maneje múltiples estados de disponibilidad.
+
+4.2 Calendario: react-day-picker con Indicadores
+
+4.3 Grid de Time Slots
+Los time slots deben ser visualmente claros. Agrupar por turno si el restaurante tiene horarios partidos (almuerzo 12-15 y cena 19-23).
+
+4.4 Sugerencias Automáticas si No Hay Disponibilidad
+
+
+5. Paso 3: Datos del Cliente (Guest-First)
+5.1 Filosofia Guest-First
+La mayor barrera para reservar online es pedir crear una cuenta. Antigravity adopta el enfoque "Guest-First": el cliente puede reservar sin cuenta. La creación de cuenta es opt-in y siempre posterior.
+
+5.2 Detección de Email Existente
+Al salir del campo email (onBlur), verificar si ese email ya tiene cuenta. Esta verificación es silenciosa y mejora la experiencia.
+
+5.3 Auth Social: Configuración Correcta
+El módulo original propone NextAuth.js para los logins sociales. Dado que el Módulo 1 ya adoptó Clerk, aquí se recomienda coherencia usando Clerk en el frontend público también.
+
+5.4 Validaciones del Formulario
+
+
+6. Paso 4: Confirmación y Pago
+6.1 Resumen de la Reserva
+La sección de resumen es crítica: el usuario ve todo lo que va a confirmar. Cada línea del resumen debe tener un botón de edición que lleve al paso correspondiente SIN perder el progreso.
+
+6.2 Integración de Pasarelas de Pago
+La pasarela activa depende de lo que configuró el restaurante en el Módulo 1. El componente PaymentForm recibe el nombre de la pasarela como prop y renderiza el formulario correcto.
+
+6.3 Máquina de Estados del Procesamiento
+
+6.4 Seguridad del Formulario de Pago
+
+
+7. Paso 5: Éxito y QR de Confirmación
+7.1 Experiencia de Confirmación
+Este paso debe generar una emoción positiva. La animación del checkmark y los detalles visuales comunican confianza y celebración.
+
+7.2 Agregar al Calendario: Implementación Completa
+
+7.3 Acciones Post-Confirmación
+
+
+8. Integración Completa con Cal.com
+8.1 Mapa de Integración
+Cal.com es el motor de disponibilidad y el sistema de verdad para las reservas. Todas las consultas de disponibilidad y creación de reservas pasan por Cal.com.
+
+8.2 Mapeo de Datos: Antigravity → Cal.com
+
+8.3 Manejo de Race Conditions
+
+
+9. Notificaciones: Email, WhatsApp y Recordatorios
+9.1 Arquitectura de Notificaciones
+Las notificaciones se envían de forma asíncrona usando BullMQ (queue) para no bloquear la respuesta de la API. El webhook de Cal.com dispara los jobs de notificación.
+
+9.2 Email de Confirmación con React Email
+
+9.3 WhatsApp de Confirmación
+
+
+10. Performance, Accesibilidad y Testing
+10.1 Métricas de Performance Objetivo
+
+10.2 Optimizaciones Clave
+
+10.3 Accesibilidad WCAG 2.1 AA
+
+10.4 Estrategia de Testing
+
+10.5 Los 3 Flujos E2E Criticos
+
+
+11. Decisiones de Arquitectura y Recomendaciones
+11.1 Cambios vs. Propuesta Original del PDF
+
+11.2 Flujo de Pago Atómico: El Punto Más Critico
+
+11.3 SEO de la Página de Reservas
+La página de reservas del restaurante debe ser indexable por Google. Esto ayuda al restaurante a aparecer en búsquedas de "reservar mesa en [restaurante]".
+
+11.4 Variables de Entorno Adicionales para Módulo 2
+
+11.5 Checklist de Lanzamiento
+
+
+Documento Técnico Módulo 2 de Antigravity — Junio 2026
+Continuación: Módulos 3, 4 y 5 pendientes de análisis.
+

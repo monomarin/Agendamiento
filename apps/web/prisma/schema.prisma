@@ -1,0 +1,395 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+enum RestaurantStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CHECKED_IN
+  NO_SHOW
+  CANCELLED
+}
+
+enum BookingSource {
+  WEB
+  WHATSAPP
+  VOICE
+  API
+  WALKIN
+  PHONE
+  MANUAL
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  HOSTESS
+  WAITER
+}
+
+model User {
+  id           String       @id @default(uuid())
+  clerkUserId  String       @unique
+  email        String       @unique
+  name         String
+  role         Role         @default(OWNER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  restaurantId String?
+  restaurant   Restaurant?  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  @@index([restaurantId])
+}
+
+model StaffMember {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  clerkUserId  String     @unique
+  email        String
+  name         String
+  role         Role       @default(WAITER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  @@index([restaurantId])
+}
+
+model Restaurant {
+  id              String            @id @default(uuid())
+  slug            String            @unique
+  name            String
+  nit             String?           // Colombian Tax ID
+  description     String?           // Max 250 characters
+  type            String            // e.g., "restaurante", "bar", "cafeteria"
+  logoUrl         String?
+  bannerUrl       String?
+  primaryColor    String            @default("#dc2626") // Default red-600
+  secondaryColor  String            @default("#171717") // Default neutral-900
+  status          RestaurantStatus  @default(DRAFT)
+  timezone        String            @default("America/Bogota")
+  city            String?
+  email           String?
+  plan            String            @default("FREE") // FREE | PRO | ENTERPRISE
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relations
+  users             User[]
+  staffMembers      StaffMember[]
+  branches          Branch[]
+  paymentSettings   PaymentSettings?
+  webhooks          Webhook[]
+  apiKeys           ApiKey[]
+  whatsappAgent     WhatsAppAgent?
+  conversations     Conversation[]
+  communicationLogs CommunicationLog[]
+
+  @@index([status])
+  @@index([city])
+  @@index([email])
+}
+
+model PaymentSettings {
+  id                     String     @id @default(uuid())
+  restaurantId           String     @unique
+  restaurant             Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  // Stripe configuration
+  stripeEnabled          Boolean    @default(false)
+  stripeAccountId        String?
+  stripePublishableKey   String?
+  stripeSecretKey        String?
+  
+  // Wompi configuration (Colombia)
+  wompiEnabled           Boolean    @default(false)
+  wompiPublicKey         String?
+  wompiPrivateKey        String?
+  wompiIntegritySecret   String?
+  
+  // Policies
+  requireDeposit         Boolean    @default(false)
+  depositAmount          Decimal    @default(0.0)
+  depositType            String     @default("FIXED") // FIXED or PERCENTAGE
+  currency               String     @default("COP")
+  cancellationPolicyDays Int        @default(1)
+}
+
+model Branch {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  address      String
+  phone        String?
+  latitude     Float?
+  longitude    Float?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  schedules    Schedule[]
+  tableTypes   TableType[]
+  zones        Zone[]
+  bookings     Booking[]
+  
+  @@index([restaurantId])
+}
+
+model Schedule {
+  id         String   @id @default(uuid())
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int      // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  openTime   String   // HH:MM (e.g., "12:00")
+  closeTime  String   // HH:MM (e.g., "23:00")
+  isClosed   Boolean  @default(false)
+  
+  @@index([branchId])
+}
+
+model TableType {
+  id           String   @id @default(uuid())
+  branchId     String
+  branch       Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name         String   // e.g., "Terraza", "Salón Principal", "VIP"
+  minCapacity  Int      @default(2)
+  maxCapacity  Int      @default(4)
+  quantity     Int      @default(5)
+  calcomEventId Int?     // Event Type ID in self-hosted Cal.com
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  tables       Table[]
+  bookings     Booking[]
+  
+  @@index([branchId])
+}
+
+model Zone {
+  id        String   @id @default(uuid())
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name      String   // e.g., "Terraza exterior", "Primer piso"
+  width     Int      @default(800)
+  height    Int      @default(600)
+  tables    Table[]
+  
+  @@index([branchId])
+}
+
+model Table {
+  id          String    @id @default(uuid())
+  tableTypeId String
+  tableType   TableType @relation(fields: [tableTypeId], references: [id], onDelete: Cascade)
+  zoneId      String
+  zone        Zone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  number      String
+  capacity    Int
+  x           Int       @default(0)
+  y           Int       @default(0)
+  shape       String    @default("ROUND") // ROUND, SQUARE, RECTANGLE
+  status      String    @default("AVAILABLE")
+  bookings    Booking[] @relation("BookingTables")
+  
+  @@index([tableTypeId])
+  @@index([zoneId])
+}
+
+model Customer {
+  id           String               @id @default(uuid())
+  email        String               @unique
+  phone        String?
+  name         String
+  notes        String?
+  tags         CustomerTag[]
+  preferences  CustomerPreference[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  bookings     Booking[]
+
+  @@index([phone])
+}
+
+model CustomerTag {
+  id         String     @id @default(uuid())
+  name       String     @unique
+  customers  Customer[]
+}
+
+model CustomerPreference {
+  id         String     @id @default(uuid())
+  key        String
+  value      String
+  customerId String
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@index([customerId])
+}
+
+model Booking {
+  id              String        @id @default(uuid())
+  branchId        String
+  branch          Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  tableTypeId     String
+  tableType       TableType     @relation(fields: [tableTypeId], references: [id], onDelete: Cascade)
+  customerId      String
+  customer        Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  // Cal.com sync
+  calcomBookingId String?       @unique
+  calcomUid       String?       @unique
+  
+  // Reservation details
+  dateTime        DateTime
+  partySize       Int
+  duration        Int           @default(90) // minutes
+  specialRequests String?
+  source          BookingSource @default(WEB)
+  status          BookingStatus @default(CONFIRMED)
+  
+  // Payment transaction metadata
+  paymentId       String?
+  paymentGateway  String?       // "STRIPE" or "WOMPI"
+  paymentAmount   Decimal?
+  paymentStatus   String?       // "PAID", "REFUNDED", "FAILED"
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Assigned physical tables
+  tables          Table[]       @relation("BookingTables")
+  
+  @@index([branchId, dateTime])
+  @@index([status])
+  @@index([customerId])
+  @@index([tableTypeId])
+}
+
+model Webhook {
+  id                  String            @id @default(uuid())
+  restaurantId        String
+  restaurant          Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  url                 String
+  secret              String
+  events              String[]
+  isActive            Boolean           @default(true)
+  consecutiveFailures Int               @default(0)
+  status              String            @default("active") // active | suspended | disabled
+  createdAt           DateTime          @default(now())
+  deliveries          WebhookDelivery[]
+  
+  @@index([restaurantId])
+}
+
+model ApiKey {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  keyHash      String     @unique // SHA-256 hash of the API key
+  name         String
+  scopes       String[]   // e.g. ['bookings:read', 'bookings:write']
+  isActive     Boolean    @default(true)
+  expiresAt    DateTime?
+  lastUsedAt   DateTime?
+  environment  String     @default("live") // live | test
+  createdAt    DateTime   @default(now())
+  
+  @@index([restaurantId])
+}
+
+model WebhookDelivery {
+  id             String   @id @default(uuid())
+  webhookId      String
+  webhook        Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event          String
+  bookingId      String?
+  idempotencyKey String   @unique // Format: `${webhookId}:${event}:${bookingId}`
+  status         String   // success | failed
+  payload        Json     // Sanitized payload (Ley 1581)
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  @@index([webhookId])
+  @@index([createdAt])
+}
+
+model PosTableMapping {
+  id                 String   @id @default(uuid())
+  restaurantId       String
+  antigravityTableId String
+  posTableNumber     String
+  createdAt          DateTime @default(now())
+
+  @@index([restaurantId])
+}
+
+model WhatsAppAgent {
+  id               String     @id @default(uuid())
+  restaurantId     String     @unique
+  restaurant       Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  whatsappNumber   String     @unique
+  accessToken      String     // encrypted
+  phoneNumberId    String
+  isActive         Boolean    @default(false)
+  personality      String?
+  language         String     @default("es")
+  autoConfirm      Boolean    @default(true)
+  escalateToHuman  Boolean    @default(true)
+  humanPhone       String?
+  createdAt        DateTime   @default(now())
+}
+
+model Conversation {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  clientPhone  String
+  messages     Json       // array of messages
+  bookingId    String?
+  status       String     @default("active") // active | resolved | transferring | human
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([restaurantId, clientPhone])
+  @@index([createdAt])
+}
+
+model ConsentRecord {
+  id            String   @id @default(uuid())
+  clientEmail   String
+  restaurantId  String
+  timestamp     DateTime @default(now())
+  policyVersion String
+  ipAddress     String
+
+  @@index([clientEmail, restaurantId])
+}
+
+model CommunicationLog {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerId   String?
+  type         String     // e.g. "whatsapp", "call", "webchat", "email"
+  direction    String     // "inbound" | "outbound"
+  content      String
+  source       String     // "bot" | "human" | "system"
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId])
+  @@index([createdAt])
+}

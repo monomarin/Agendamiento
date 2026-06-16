@@ -1,0 +1,255 @@
+ANTIGRAVITY PLATFORM
+MÓDULO 5: API, WEBHOOKS E INTEGRACIONES
+Documento de Correcciones, Errores Lógicos y Recomendaciones de Arquitectura
+Versión 1.0  •  Junio 2026  •  Basado en Módulos 1, 2, 3 y 4 (Referencia de Continuidad)
+📋 Resumen Ejecutivo
+El Módulo 5 de Antigravity es la Capa de Integración y API Pública: la interfaz que permite que sistemas externos (POS, Google Maps, Zapier) consuman y alimenten datos de la plataforma. Es el módulo con mayor exposición al exterior y, por tanto, el de mayor riesgo de seguridad de toda la plataforma.
+
+Este documento analiza el prompt técnico original del Módulo 5 e identifica errores críticos de arquitectura, bugs de código, inconsistencias con los módulos anteriores y decisiones de diseño que, si se implementan tal como están, generarían brechas de seguridad, inconsistencias de datos con Cal.com o una experiencia degradada para los desarrolladores que consuman la API. El objetivo es que el equipo inicie la implementación con una base sólida y sin retrabajo costoso.
+
+
+🗺️ Contenido
+
+1. Errores Críticos de Arquitectura
+Los siguientes errores, si no se corrigen antes de comenzar el desarrollo, pueden causar brechas de seguridad en producción, pérdida de datos o inconsistencias irrecuperables con Cal.com.
+
+1.1 La API Pública Escribe Directamente a la BD sin Pasar por Cal.com
+
+1.2 Rate Limiting Aplicado por IP, No por API Key
+
+1.3 El Middleware No Valida la Expiración del API Key
+
+1.4 El Sistema de Webhooks Salientes Bloquea el Request de la API
+
+1.5 axios en Edge Functions: Incompatibilidad con Vercel
+
+2. Inconsistencias con Módulos 1, 2, 3 y 4
+
+
+
+3. Bugs de Código en los Snippets del Documento
+
+3.1 Bug: request.headers.set() No Funciona en Next.js App Router
+
+3.2 Bug: Firma HMAC Enviada Sin Prefijo 'sha256='
+
+3.3 Bug: El Endpoint GET /api/v1/availability No Filtra por restaurantId
+
+3.4 Bug: PUT /api/v1/bookings/:id Permite Cambiar el restaurantId
+
+3.5 Bug: El SDK de Node.js No Maneja Errores de Red
+
+4. Errores en la Autenticación y Seguridad de la API
+
+4.1 Las Claves API Se Almacenan en Plain Text
+
+4.2 Sin Scopes de Permisos por Clave: Lectura vs. Escritura
+
+
+4.3 Documentación Swagger Accesible sin Autenticación: Riesgo de Exposición
+
+5. Problemas en el Sistema de Webhooks Salientes
+
+5.1 Sin Deduplicación de Eventos: El Mismo Evento Puede Dispararse Dos Veces
+
+5.2 El Backoff Exponencial No Contempla la Desactivación Automática
+
+5.3 El Historial de Entregas Expone el Payload Completo con Datos Sensibles
+
+6. Gaps en las Integraciones Nativas
+
+6.1 Google Reserve: El Flujo de Validación No Está Documentado
+
+6.2 Zapier/Make: Sin Triggers de Salida ni Autenticación OAuth
+
+6.3 Integración POS: El Mapeo de Campos No Está Definido
+
+7. Documentación y SDK: Riesgos de Mantenimiento
+
+7.1 La Documentación Swagger No Está Sincronizada Automáticamente
+
+7.2 El Sandbox/Playground No Tiene Datos de Prueba Aislados
+
+7.3 Versionado de API: Sin Estrategia de Deprecación
+
+8. Dashboard de Integraciones: Gaps de UX y Seguridad
+
+8.1 El Dashboard No Diferencia Claves Live de Claves Test en la UI
+
+8.2 El Log de Webhooks No Permite Filtrar por Rango de Fechas
+El componente WebhookLogs.tsx muestra los logs con filtro por estado y fecha. Sin embargo, el documento no especifica la paginación del log. Un restaurante con alto volumen (500+ webhooks/día) y 3 integraciones activas puede acumular 1,500+ registros por día. Cargar todos en el cliente causará timeout y una tabla inutilizable.
+
+
+8.3 El Panel de Integraciones No Indica Qué Datos se Comparten con Cada Integración
+
+9. Decisiones de Arquitectura: Cambios Recomendados
+
+
+10. Variables de Entorno Adicionales para Módulo 5
+
+
+11. Checklist de Lanzamiento del Módulo 5
+
+ARQUITECTURA Y SEGURIDAD
+
+WEBHOOKS Y COLAS
+
+INTEGRACIONES Y FUNCIONALIDAD
+
+DOCUMENTACIÓN Y SDK
+
+COMPLIANCE Y DATOS
+
+TESTING ANTES DE PRODUCCIÓN
+
+Documento Técnico — Módulo 5 de Antigravity
+Junio 2026  •  Continuación de los Documentos de Módulos 1, 2, 3 y 4
+Versión 1.0  •  Antigravity Platform
+⭐ CONEXIÓN CON MÓDULOS ANTERIORES
+Todo lo construido en Módulos 1, 2, 3 y 4 es la fuente de verdad para el Módulo 5: Clerk (Módulo 1) → el dashboard de integraciones usa el mismo sistema de auth; la API Key se asocia a un restaurantId que viene de Clerk Organizations. Cal.com (Módulo 1) → TODA creación y modificación de reserva vía la API pública DEBE pasar por Cal.com API v2; nunca escritura directa a BD. BullMQ + Redis (Módulo 2) → el disparo de webhooks salientes debe encolarse en BullMQ para no bloquear el response de la API y respetar el backoff exponencial. Pusher (Módulo 3) → cuando un sistema externo crea una reserva via API, el dashboard del Módulo 3 debe recibir el evento en tiempo real via Pusher, no Socket.io. CommunicationLog (Módulo 3) → toda interacción de la API pública (reservas creadas por POS, check-ins desde Google Maps) debe registrarse en CommunicationLog. Rate Limiting Upstash (Módulo 1) → el Módulo 5 reutiliza el mismo cliente @upstash/redis ya configurado; no crear una instancia paralela.
+Sección | Tema
+1. | Errores Críticos de Arquitectura (resolver antes de escribir código)
+2. | Inconsistencias con Módulos 1, 2, 3 y 4
+3. | Bugs de Código en los Snippets del Documento
+4. | Errores en la Autenticación y Seguridad de la API
+5. | Problemas en el Sistema de Webhooks Salientes
+6. | Gaps en las Integraciones Nativas
+7. | Documentación y SDK: Riesgos de Mantenimiento
+8. | Dashboard de Integraciones: Gaps de UX y Seguridad
+9. | Decisiones de Arquitectura: Cambios Recomendados vs. Propuesta Original
+10. | Variables de Entorno Adicionales
+11. | Checklist de Lanzamiento del Módulo 5
+⚠️ PROBLEMA CRÍTICO: El endpoint POST /api/v1/bookings bypasea Cal.com
+El servicio createBookingService() del documento crea la reserva directamente en PostgreSQL via Prisma. Este es exactamente el mismo anti-patrón ya identificado y corregido en el Módulo 3 (Sección 1.3). CONSECUENCIA: La reserva existe en Antigravity pero NO en Cal.com. El slot queda disponible en el motor de disponibilidad → dos clientes pueden reservar la misma mesa simultáneamente. El restaurante verá el slot libre en Cal.com y lo podrá bloquear manualmente, generando un doble-booking. SOLUCIÓN OBLIGATORIA: Igual que en Módulos 2, 3 y 4, toda creación de reserva debe seguir el flujo: 1. Verificar disponibilidad → Cal.com GET /api/v2/slots 2. Crear reserva → Cal.com POST /api/v2/bookings 3. Cal.com dispara webhook BOOKING_CREATED → Antigravity lo recibe y escribe en BD 4. Responder al cliente externo con { bookingId, confirmationCode } El createBookingService() del Módulo 5 DEBE ser el mismo servicio ya implementado en el Módulo 4 (lib/calcom.ts createBooking()), no uno nuevo.
+⚠️ ERROR CRÍTICO DE SEGURIDAD: El rate limit usa request.ip en lugar del API Key
+En el middleware de autenticación, el rate limiting se aplica sobre la IP del cliente: const ip = request.ip || '127.0.0.1'; const { success } = await ratelimit.limit(ip); PROBLEMA 1: Un atacante puede cambiar de IP (VPN, proxies) para evitar el límite. PROBLEMA 2: Múltiples restaurantes legítimos detrás del mismo NAT corporativo compartirán el mismo límite y se bloquearán entre sí. PROBLEMA 3: Los límites por plan (Free: 100/h, Pro: 1000/h) no se pueden aplicar por IP; requieren conocer el plan del restaurante, que está en keyRecord. SOLUCIÓN: Aplicar rate limit sobre el API Key o restaurantId, que ya está validado en ese punto del middleware: const { success, limit, reset, remaining } = await ratelimit.limit(keyRecord.restaurantId); Usar un límite diferente por plan: crear instancias separadas de Ratelimit para cada plan (FREE_LIMITER, PRO_LIMITER) y seleccionar según keyRecord.restaurant.plan.
+⚠️ PROBLEMA DE SEGURIDAD: isActive no es suficiente para invalidar una clave comprometida
+El middleware verifica únicamente keyRecord.isActive. Sin embargo, el esquema del documento no incluye campos de expiración ni rotación de claves. ESCENARIOS NO CUBIERTOS: • Un API Key filtrado a internet no tiene forma de expirar automáticamente (solo revocar manualmente). • Las claves de test (res_test_...) deberían bloquearse automáticamente en el entorno de producción. • Si un desarrollador externo abandona el proyecto, su clave seguirá activa indefinidamente. SOLUCIÓN: Agregar campos al schema de ApiKey: model ApiKey {   expiresAt   DateTime?   // null = sin expiración   lastUsedAt  DateTime?   // para detectar claves inactivas   environment String      @default('live') // 'live' | 'test' } En el middleware, verificar: if (keyRecord.expiresAt && keyRecord.expiresAt < new Date()) → 401 'API Key expirada'. Las claves test solo funcionan en el entorno de staging (variable de entorno NODE_ENV).
+⚠️ PROBLEMA CRÍTICO: triggerWebhook() se llama de forma síncrona dentro del request
+La función triggerWebhook() usa axios.post() directamente con un timeout de 30 segundos. Si el endpoint del restaurante está caído o lento, el request del cliente externo esperará hasta 30 segundos antes de recibir respuesta. CONSECUENCIA: Una reserva creada por el POS del restaurante puede tardar 30 segundos en responder porque el webhook de Slack del restaurante está caído. Esto es inaceptable en producción. SOLUCIÓN: Encolar el disparo del webhook en BullMQ (ya disponible del Módulo 2) y responder inmediatamente: // Responder al cliente externo inmediatamente const booking = await createBookingViaCalCom(data); // Encolar el webhook sin await — no bloquear webhookQueue.add('trigger-webhook', { event: 'booking.created', payload: booking }); return NextResponse.json({ success: true, data: booking }, { status: 201 }); El worker de BullMQ maneja los reintentos con backoff exponencial, el historial de entregas y los timeouts de forma independiente.
+⚠️ PROBLEMA DE COMPATIBILIDAD: axios no funciona en Vercel Edge Runtime
+El documento usa import axios from 'axios' en lib/webhooks.ts para disparar los webhooks. Las API Routes de Next.js en Vercel pueden ejecutarse en Edge Runtime, donde axios no está disponible (es un módulo de Node.js). CONSECUENCIA: El disparo de webhooks fallará silenciosamente en producción si la ruta se configura como Edge Function. En local (Node.js) funciona sin problema. SOLUCIÓN: Reemplazar axios por la fetch API nativa que sí es compatible con Edge Runtime: // INCORRECTO await axios.post(webhook.url, body, { headers, timeout: 30000 });  // CORRECTO — compatible con Edge y Node.js const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 30000); await fetch(webhook.url, { method: 'POST', headers, body, signal: controller.signal }); clearTimeout(timeoutId); Si se mantiene BullMQ para el disparo asíncrono (recomendado en punto 1.4), este worker corre en Node.js y sí puede usar fetch nativo sin problemas.
+Tema | Módulos 1/2/3/4 (Decisión Tomada) | Módulo 5 (Inconsistencia)
+Sistema Auth de API | Clerk Organizations (Módulo 1) para el dashboard | El dashboard de integraciones no especifica cómo se vincula con Clerk; riesgo de crear un sistema de auth paralelo
+Cal.com como fuente de verdad | Cal.com API primero, BD via webhook (M1/M2/M3/M4) | createBookingService() escribe directamente a BD sin pasar por Cal.com
+Webhooks asíncronos | BullMQ queue existente (Módulo 2) para toda notificación async | triggerWebhook() es síncrono con axios; no reutiliza la queue de BullMQ
+Cliente Redis | @upstash/redis (Módulo 1) | El documento importa ratelimit from '@/lib/redis' sin especificar si usa el cliente de Upstash ya configurado; riesgo de crear instancia duplicada con ioredis
+Real-time para el dashboard | Pusher canales privados (Módulo 3) | Cuando la API externa crea una reserva, no hay emisión a Pusher para notificar al Dashboard del Módulo 3 en tiempo real
+CommunicationLog | Tabla unificada de comunicaciones (Módulo 3) | Las reservas creadas via API externa no se registran en CommunicationLog, rompiendo el historial del CRM
+Manejo de errores | Patrón Saga con compensating transactions (Módulo 2) | POST /api/v1/bookings no implementa rollback si Cal.com falla después de un pago
+Timezone de reservas | branch.timezone con date-fns-tz (Módulo 3) | GET /api/v1/availability no especifica en qué timezone se devuelven los slots; un POS en Bogotá puede recibir slots en UTC y mostrarlos desfasados
+📌 ACCIÓN REQUERIDA: Sincronización del disparo de Pusher desde la API Pública
+Cuando un sistema externo (POS, Zapier) crea una reserva via POST /api/v1/bookings, el Dashboard del Módulo 3 NO se enterará en tiempo real a menos que se emita el evento de Pusher. Después de que el webhook de Cal.com confirme la reserva (BOOKING_CREATED), el handler del webhook debe emitir: await pusher.trigger(`private-restaurant-${restaurantId}`, 'new-booking', {   ...bookingData,   source: 'api',  // distinguir visualmente en el dashboard }); Sin esto, el personal del restaurante no verá las reservas del POS en tiempo real en el Dashboard hasta recargar la página.
+🐛 BUG: Los headers del request son de solo lectura en Next.js App Router
+En el middleware, el documento intenta pasar el restaurantId a la API Route modificando los headers: request.headers.set('x-restaurant-id', keyRecord.restaurantId); PROBLEMA: En Next.js App Router, los headers del request son inmutables (ReadonlyHeaders). Esta línea lanza un TypeError en tiempo de ejecución. CORRECCIÓN: Usar NextResponse con headers adicionales o pasar el dato via un header en la respuesta que se reenvía: // CORRECTO: crear nuevo objeto de headers const requestHeaders = new Headers(request.headers); requestHeaders.set('x-restaurant-id', keyRecord.restaurantId); requestHeaders.set('x-restaurant-plan', keyRecord.restaurant.plan); return NextResponse.next({ request: { headers: requestHeaders } });
+🐛 BUG: La firma del webhook omite el prefijo estándar de la industria
+En lib/webhooks.ts, la firma se genera y envía así: const signature = crypto.createHmac('sha256', webhook.secret).update(body).digest('hex'); headers: { 'X-Webhook-Signature': signature } PROBLEMA: El estándar de la industria (Stripe, GitHub, Shopify, Cal.com) antepone 'sha256=' a la firma para identificar el algoritmo. Sin este prefijo, los desarrolladores que integren la API no podrán verificar la firma usando los snippets estándar de cualquier lenguaje. CORRECCIÓN: 'X-Webhook-Signature': `sha256=${signature}`, Actualizar la documentación y los snippets del SDK para reflejar el prefijo. Los desarrolladores que ya estén usando el formato sin prefijo necesitarán migrar, por lo que es crítico corregir esto antes del primer lanzamiento público.
+🐛 BUG DE SEGURIDAD: Cualquier API Key puede consultar la disponibilidad de cualquier restaurante
+El endpoint GET /api/v1/availability consulta Cal.com sin verificar que el eventTypeId o el restaurantId solicitado pertenece al restaurante autenticado. ESCENARIO: El restaurante A conoce el eventTypeId del restaurante B (visible en el HTML de la página pública) y puede consultar su disponibilidad con su propio API Key. Si bien esto solo expone información de disponibilidad (no datos sensibles), viola el principio de aislamiento de tenants y puede usarse para espionaje competitivo. SOLUCIÓN: Verificar siempre que el eventTypeId pertenece al restaurantId autenticado: const eventType = await db.tableType.findFirst({   where: { calEventTypeId: params.eventTypeId, restaurantId: req.headers.get('x-restaurant-id') } }); if (!eventType) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+🐛 VULNERABILIDAD: Un cliente externo puede mover reservas entre restaurantes
+El endpoint PUT /api/v1/bookings/:id actualiza el estado de una reserva (check-in, no-show, cancelado). Sin embargo, el documento no verifica que la reserva a actualizar pertenezca al restaurante autenticado. Un atacante con un API Key válido (de cualquier restaurante) podría hacer check-in o cancelar reservas de otros restaurantes si conoce el ID de la reserva. SOLUCIÓN OBLIGATORIA: Igual que en el Módulo 4 (cancelBooking), verificar ownership antes de cualquier mutación: const reservation = await db.reservation.findUnique({ where: { id: params.id } }); if (!reservation || reservation.restaurantId !== restaurantId) {   return NextResponse.json({ error: 'Not Found' }, { status: 404 }); } Retornar 404 (no 403) para no confirmar si el recurso existe en otro restaurante.
+🐛 BUG: createBooking() en el SDK no tiene try/catch ni manejo de errores HTTP
+El snippet del SDK en sdk/src/client.ts llama a fetch sin verificar response.ok: async createBooking(bookingData: BookingPayload) {   const response = await fetch(`${this.baseUrl}/bookings`, { ... });   return response.json();  // ← si es 400/429/500, retorna el objeto de error sin lanzar excepción } PROBLEMA: Si el servidor retorna 429 (rate limit) o 400 (datos inválidos), el SDK retorna el objeto de error JSON silenciosamente. El desarrollador que usa el SDK no sabe que falló a menos que inspeccione el resultado. CORRECCIÓN estándar para SDKs: const response = await fetch(...); if (!response.ok) {   const errorBody = await response.json().catch(() => ({}));   throw new AntigravityApiError(response.status, errorBody.error ?? 'Unknown error'); } return response.json();
+⚠️ PROBLEMA CRÍTICO DE SEGURIDAD: El hash del API Key no está contemplado
+El modelo ApiKey almacena la clave como string en texto plano en PostgreSQL. Si la base de datos es comprometida, todos los API Keys quedan expuestos. El estándar de la industria (Stripe, GitHub) es almacenar ÚNICAMENTE el hash SHA-256 de la clave, nunca la clave en sí. La clave en texto plano solo se muestra UNA vez al crearse y nunca se vuelve a mostrar. IMPLEMENTACIÓN CORRECTA: // Al crear el API Key: const rawKey = `res_live_${crypto.randomBytes(32).toString('hex')}`; const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex'); await db.apiKey.create({ data: { keyHash, name, restaurantId, ... } }); // Devolver rawKey al usuario UNA sola vez — no se puede recuperar después  // Al validar en el middleware: const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex'); const keyRecord = await prisma.apiKey.findUnique({ where: { keyHash } }); El campo clave en el schema debe renombrarse a keyHash y marcarse con @unique.
+⚠️ FUNCIONALIDAD FALTANTE: El documento menciona scopes pero no los implementa
+El documento describe 'Opción de generar múltiples claves con permisos específicos (solo lectura, solo escritura)' pero el schema de ApiKey no incluye un campo de scopes/permisos. Consecuencia: Todas las claves tienen acceso total. Una clave dada a un partner de analytics (solo lectura) podría usarse para crear o cancelar reservas. IMPLEMENTACIÓN RECOMENDADA: Agregar campo scopes al schema: model ApiKey {   scopes String[]  // ['bookings:read', 'bookings:write', 'availability:read', 'tables:write'] } En cada endpoint, verificar el scope requerido después de autenticar: const requiredScope = 'bookings:write'; if (!keyRecord.scopes.includes(requiredScope)) {   return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }); }
+Scope | Endpoints Autorizados | Caso de Uso
+bookings:read | GET /api/v1/bookings | Sistema de analytics o BI externo
+bookings:write | POST, PUT, DELETE /api/v1/bookings | POS del restaurante que crea reservas
+availability:read | GET /api/v1/availability | App móvil del restaurante o Google Maps
+tables:write | PUT /api/v1/tables/:id | Sistema de floor plan externo
+customers:read | GET /api/v1/customers | CRM externo o herramienta de marketing
+webhooks:manage | Dashboard de configuración de webhooks | Solo el dueño del restaurante
+⚠️ CONSIDERACIÓN DE SEGURIDAD: /api/docs expone la estructura interna sin auth
+El middleware excluye explícitamente /api/docs de la autenticación. Esto permite que cualquier persona en internet acceda a la documentación completa de la API. Si bien la documentación pública puede ser un objetivo (para una plataforma open-partner como Stripe), para el MVP de Antigravity esto expone: • La estructura de datos interna (campos, tipos, validaciones). • Los nombres de los endpoints y los scopes de permisos. • Posibles campos internos que no deberían ser públicos (ej. internalNotes en Customer). RECOMENDACIÓN para MVP: Proteger /api/docs con autenticación de Clerk. Solo usuarios con restaurante activo pueden ver la documentación. RECOMENDACIÓN para Fase 2 (plataforma abierta): Crear dos versiones de la spec — una pública (solo endpoints de disponibilidad y reservas) y una privada (todos los endpoints).
+⚠️ PROBLEMA: Un evento de Cal.com puede generar dos webhooks salientes al sistema externo
+Cuando Cal.com dispara el webhook BOOKING_CREATED, el handler de Antigravity:   1. Escribe en la tabla Reservation de PostgreSQL.   2. Debe disparar el webhook saliente al POS o Zapier del restaurante. Si el handler falla después del punto 1 pero antes del punto 2 y se reintenta (BullMQ), la reserva ya está en BD pero el webhook vuelve a intentarse. El POS del restaurante recibirá booking.created dos veces para la misma reserva. SOLUCIÓN: Implementar idempotency key en la tabla WebhookDelivery: model WebhookDelivery {   idempotencyKey String  @unique  // = `${webhookId}:${event}:${bookingId}`   status         String  // 'success' | 'failed' | 'pending' } Antes de disparar, verificar si ya existe un WebhookDelivery con ese idempotencyKey y status='success'.
+⚠️ GAP: Un endpoint de webhook caído indefinidamente seguirá acumulando reintentos
+El documento define reintentos a los 5 min, 30 min y 4 horas. Pero no define qué ocurre después del tercer intento fallido. ESCENARIO: El servidor del restaurante lleva 3 días caído. BullMQ sigue intentando enviar cada 4 horas, acumulando jobs fallidos en la queue. Esto genera: • Acumulación de jobs en Redis que consumen memoria. • Ruido en los logs que oculta errores reales. • Si el servidor vuelve después de 3 días, recibe 100+ webhooks de golpe. SOLUCIÓN: Política de desactivación automática: // Después de 5 fallos consecutivos: // 1. Marcar el webhook como status='suspended' en BD // 2. Notificar al dueño del restaurante por email: //    'Tu webhook a https://... ha fallado 5 veces. Lo hemos pausado.' // 3. Mostrar alerta en el dashboard con botón 'Reactivar' Definir en la tabla Webhook los campos: consecutiveFailures (Int, default 0) y status ('active' | 'suspended' | 'disabled').
+⚠️ RIESGO: Los logs de webhook almacenan el payload completo incluyendo PII del cliente
+La tabla WebhookDelivery almacena el payload completo del evento (booking.created incluye nombre, email y teléfono del cliente). Cualquier miembro del staff con acceso al panel puede ver estos datos en el historial de entregas. En Colombia, la Ley 1581 (Habeas Data) exige minimización de datos. El historial de logs no debería almacenar datos personales completos. SOLUCIÓN: Anonimizar el PII en el payload almacenado: const sanitizedPayload = {   ...payload,   customerName: payload.customerName?.slice(0, 1) + '***',   customerEmail: maskEmail(payload.customerEmail),   customerPhone: payload.customerPhone?.slice(-4).padStart(10, '*'), }; await db.webhookDelivery.create({ data: { ..., payload: sanitizedPayload } }); El payload completo ya está en la tabla Reservation; los logs solo necesitan el ID de la reserva para debugging.
+⚠️ GAP CRÍTICO: Google Reserve requiere un proceso de aprobación de hasta 30 días
+El documento menciona 'Requiere validación de Google (Google Business Profile API)' sin detallar el proceso real. Google Reserve NO es una integración que se activa con un API Key. Requiere:   1. Registro como partner de Reserve with Google (proceso manual, formulario).   2. Integración con la especificación de Google Reserve feeds (formato específico de XML o API).   3. Revisión y aprobación por parte de Google (puede tomar 2-8 semanas).   4. Cumplimiento continuo de las políticas de Google Business. RECOMENDACIÓN: No incluir Google Reserve en el MVP. Documentar como 'Próximamente' en el dashboard. Iniciar el proceso de registro con Google en paralelo al desarrollo para tenerlo listo en Fase 2. ALTERNATIVA más rápida para Fase 1: Implementar Google Business Profile API (no Reserve) que permite actualizar horarios, responder reseñas y ver métricas. La API de Business Profile SÍ tiene acceso inmediato con OAuth.
+⚠️ GAP: La integración de Zapier está incompleta para publicarse en el marketplace
+El documento describe la integración Zapier desde el punto de vista del webhook saliente (Antigravity notifica a Zapier). Pero para aparecer en el marketplace de Zapier como una app oficial, se requiere:   1. Crear una Zapier CLI App con autenticación OAuth 2.0 (no API Key).   2. Definir Triggers (eventos que Zapier puede escuchar) Y Actions (cosas que Zapier puede hacer en Antigravity).   3. Publicación en el marketplace de Zapier (revisión manual, ~2-4 semanas). RECOMENDACIÓN MVP: Implementar integración via webhook genérico (el sistema de webhooks del punto 2 ya cubre esto sin necesidad de una app de Zapier oficial). Documentar en la guía de inicio rápido cómo configurar Zapier usando el webhook genérico de Antigravity. La app oficial de Zapier es una mejora de Fase 2 que requiere un proceso de publicación formal.
+⚠️ GAP: La integración con Vendty/SoftRestaurant requiere mapeo de campos específico
+El documento menciona 'Mapeo de campos (Nombre cliente -> Orden POS)' sin definir el mapeo completo. Este mapeo es fundamental para que la integración sea útil y varía por POS. CAMPOS MÍNIMOS que debe soportar el endpoint /api/webhooks/incoming para un POS:  El mapeo de mesas (tableTypeId → número de mesa en el POS) requiere una tabla de configuración por restaurante: PosTableMapping { antigravityTableId, posTableNumber }. Sin esta tabla, las reservas aparecerán en el POS sin asignación de mesa.
+⚠️ RIESGO: La spec de OpenAPI puede desincronizarse del código real
+El documento propone usar next-swagger-doc donde los desarrolladores escriben los comentarios JSDoc manualmente en cada endpoint. Esto genera un riesgo crítico a largo plazo: cuando un endpoint cambia su schema (nuevo campo, campo eliminado), el desarrollador puede olvidar actualizar el comentario JSDoc. CONSECUENCIA: Un desarrollador externo leerá en la doc que la respuesta incluye el campo depositAmount pero el endpoint ya no lo devuelve → integración rota. SOLUCIÓN: Generar la documentación desde la validación Zod (que ya es la fuente de verdad del código): import { generateOpenApiDocument } from 'zod-to-openapi'; Librería recomendada: @asteasolutions/zod-to-openapi. Define los schemas Zod una sola vez y genera tanto la validación del endpoint como la spec OpenAPI automáticamente. Con este enfoque, si el schema Zod cambia → la documentación cambia automáticamente → nunca hay desincronización.
+⚠️ GAP: El entorno de prueba puede contaminar datos reales del restaurante
+El documento menciona un 'Sandbox para probar sin afectar datos reales' pero no especifica cómo se aíslan los datos de prueba. Si el sandbox usa el mismo restaurantId que el entorno live, una reserva de prueba creada desde Swagger puede:   • Aparecer en el dashboard del restaurante como una reserva real.   • Bloquear slots en Cal.com (si el flujo correcto pasa por Cal.com).   • Disparar emails de confirmación al cliente ficticio. SOLUCIÓN: Las claves de tipo res_test_... deben: 1. Usar un restaurante de prueba separado en BD (restaurantId de sandbox) 2. Llamar a Cal.com en modo de prueba (sandbox environment de Cal.com si existe) 3. No disparar emails ni WhatsApp reales (usar Resend en modo sandbox) 4. Limpiar automáticamente las reservas de prueba después de 24 horas (cron job) Agregar campo environment a la tabla Restaurant: 'production' | 'sandbox'.
+⚠️ RIESGO A LARGO PLAZO: /api/v1 sin política de deprecación genera deuda técnica
+El documento define la versión v1 en la URL (/api/v1/bookings) pero no documenta la política de versionado: cuándo se crea una v2, cuánto tiempo vive la v1, cómo se comunica la deprecación a los integradores. Sin esta política, cualquier cambio breaking (renombrar un campo, cambiar el formato de una fecha) requiere:   A) Mantener compatibilidad hacia atrás indefinidamente (acumula deuda técnica).   B) Romper la integración de todos los POS y partners sin previo aviso. POLÍTICA MÍNIMA RECOMENDADA (definir ahora, antes de lanzar): • Una versión se depreca con mínimo 6 meses de aviso previo. • El aviso se envía por email a todos los restaurantes con claves activas. • Header de respuesta: 'Deprecation: true' + 'Sunset: <fecha>' cuando un endpoint está deprecated. • Mantener v1 activa 12 meses después del lanzamiento de v2.
+⚠️ RIESGO DE UX: Un usuario puede confundir una clave de test con una de producción
+El dashboard muestra las API Keys en una tabla sin diferenciar visualmente entre res_live_... y res_test_.... En producción, un restaurante puede copiar una clave de test a su POS real y no entender por qué las reservas no aparecen en Cal.com. SOLUCIÓN: En el componente ApiKeyManager.tsx, mostrar badges visuales:   • Clave LIVE: badge verde 'Producción'. Fondo de la fila blanco.   • Clave TEST: badge amarillo 'Pruebas'. Fondo de la fila amarillo suave.   • Agregar tooltip: 'Las claves de prueba no crean reservas reales ni envían notificaciones.'   • En el formulario de creación, forzar al usuario a elegir explícitamente 'Producción' o 'Pruebas'.
+Problema en el Log | Implementación Recomendada
+Sin paginación server-side | Implementar cursor-based pagination (cursor: lastId) para manejar miles de registros sin degradar la BD
+Sin búsqueda por bookingId | Agregar campo de búsqueda por ID de reserva para debugging rápido de una integración específica
+Sin exportación | Botón 'Exportar CSV' (últimos 30 días) para que el restaurante pueda auditar entregas manualmente
+Sin métricas de tasa de éxito | Mostrar 'X% éxito en las últimas 24h' por webhook para identificar endpoints problemáticos rápidamente
+⚠️ REQUISITO LEGAL: Ley 1581 exige informar al usuario qué datos se transfieren a terceros
+El grid de apps (Google, Slack, Zapier, POS) muestra un toggle de conexión pero no informa al restaurante (ni a sus clientes) qué datos personales de clientes se transfieren a cada sistema externo. REQUERIMIENTO OBLIGATORIO: Antes de activar cualquier integración, mostrar un modal de consentimiento informado que especifique:   • Qué datos se transfieren (nombre, email, teléfono del cliente).   • Con qué sistema se comparten (ej. 'Slack recibirá el nombre del cliente VIP').   • Dónde se almacenan esos datos (país/región del servidor del tercero).   • Cómo desactivar la transferencia (toggle en el panel). Registrar en la tabla ConsentRecord del restaurante la activación de cada integración con timestamp y versión de la política.
+Tema | Propuesta Original | Recomendación Final
+POST /api/v1/bookings | Escritura directa a BD via createBookingService() | 🔴 Cal.com API primero → BD via webhook (mismo patrón M2/M3/M4)
+Rate limiting | Por IP del cliente | 🔴 Por restaurantId / API Key con límite según plan
+Firma HMAC saliente | Sin prefijo 'sha256=' | 🔴 Prefijo estándar 'sha256=' en X-Webhook-Signature
+Almacenamiento API Key | Plain text en BD | 🔴 Solo almacenar hash SHA-256 de la clave
+triggerWebhook() | Síncrono con axios (bloquea el request) | 🔴 Asíncrono via BullMQ queue (no bloquea)
+axios en Edge Functions | axios.post() en lib/webhooks.ts | 🔴 fetch nativo compatible con Edge Runtime
+request.headers.set() | Mutable (lanza TypeError en Next.js App Router) | 🔴 new Headers(request.headers) con NextResponse.next()
+Permisos por clave (scopes) | Mencionado pero no implementado en schema | 🟡 Campo scopes String[] en ApiKey con verificación en cada endpoint
+Expiración de claves | Solo isActive boolean | 🟡 Campo expiresAt DateTime? + lastUsedAt DateTime?
+Deduplicación de webhooks | Sin idempotency key | 🟡 idempotencyKey único en WebhookDelivery
+Desactivación de webhooks fallidos | Sin política después del último reintento | 🟡 Auto-suspender después de 5 fallos + notificar por email
+Documentación OpenAPI | JSDoc manual (puede desincronizarse) | 🟡 zod-to-openapi — generado desde los schemas Zod
+Sandbox de pruebas | Sin aislamiento de datos | 🟠 Restaurante sandbox separado, claves test no afectan Cal.com live
+Google Reserve | Incluido en MVP | 🟠 Mover a Fase 2 (requiere proceso de aprobación 2-8 semanas con Google)
+PII en logs de webhook | Payload completo almacenado | 🟠 Anonimizar nombre/email/teléfono antes de guardar en WebhookDelivery
+Consentimiento de integraciones | Solo toggle de conexión | 🟠 Modal de consentimiento informado + registro en ConsentRecord (Ley 1581)
+Versionado de API | Sin política de deprecación | 🟢 Definir política antes del lanzamiento (sunset headers, 6 meses de aviso)
+NUEVAS VARIABLES .env.local (MÓDULO 5)
+# API Pública API_KEY_ENCRYPTION_SALT=32-bytes-hex  # Para generación de hashes seguros API_KEY_PREFIX_LIVE=res_live_ API_KEY_PREFIX_TEST=res_test_  # Webhooks Salientes WEBHOOK_SIGNING_SECRET=32-bytes-hex   # Para firmar X-Webhook-Signature WEBHOOK_TIMEOUT_MS=30000              # Timeout de entrega por webhook WEBHOOK_MAX_FAILURES=5                # Intentos antes de auto-suspender  # Integraciones GOOGLE_BUSINESS_PROFILE_CLIENT_ID=... GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET=... SLACK_BOT_TOKEN=xoxb-...              # Para notificaciones de Slack ZAPIER_WEBHOOK_VERIFICATION_SECRET=... # Verificar webhooks entrantes de Zapier POS_INCOMING_WEBHOOK_SECRET=...       # Verificar webhooks entrantes del POS  # Sandbox SANDBOX_RESTAURANT_ID=...             # ID del restaurante de prueba en BD  # Rate Limiting por Plan (reutiliza UPSTASH_REDIS del Módulo 1) RATE_LIMIT_FREE_REQUESTS_PER_HOUR=100 RATE_LIMIT_PRO_REQUESTS_PER_HOUR=1000  # (Todas las variables de Módulos 1, 2, 3 y 4 siguen siendo necesarias) # Especialmente: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN, # PUSHER_*, CLERK_*, CALCOM_API_KEY, DATABASE_URL
+[ ] | POST /api/v1/bookings pasa por Cal.com API (no escritura directa a BD)
+[ ] | PUT /api/v1/bookings/:id verifica que la reserva pertenece al restaurante autenticado (404 si no)
+[ ] | GET /api/v1/availability verifica que el eventTypeId pertenece al restaurante autenticado
+[ ] | API Keys almacenadas como hash SHA-256 (nunca plain text); se muestran solo al crearse
+[ ] | Rate limiting aplicado por restaurantId con límites diferenciados por plan (Free/Pro/Enterprise)
+[ ] | Scopes de permisos implementados en ApiKey y verificados en cada endpoint
+[ ] | Firma HMAC saliente incluye prefijo 'sha256=' en header X-Webhook-Signature
+[ ] | request.headers mutado correctamente via new Headers() + NextResponse.next({ request: { headers } })
+[ ] | axios reemplazado por fetch nativo en lib/webhooks.ts (compatibilidad con Edge Runtime)
+[ ] | Documentación Swagger protegida con autenticación Clerk (no accesible sin sesión)
+[ ] | triggerWebhook() encolado en BullMQ (asíncrono) — no bloquea el response de la API
+[ ] | Deduplicación con idempotencyKey en tabla WebhookDelivery — ningún evento se entrega dos veces
+[ ] | Política de desactivación: auto-suspender webhook después de 5 fallos + email al dueño
+[ ] | PII anonimizado en payload guardado en WebhookDelivery (nombre, email, teléfono)
+[ ] | Paginación server-side en WebhookLogs.tsx (cursor-based, no cargar todos en cliente)
+[ ] | Webhook entrante del POS verifica firma HMAC en header x-pos-signature
+[ ] | Timeout de entrega configurado con AbortController (no con axios timeout)
+[ ] | Reservas creadas via API aparecen en Dashboard del Módulo 3 en tiempo real (evento Pusher emitido desde webhook de Cal.com)
+[ ] | Reservas via API registradas en CommunicationLog con source: 'api'
+[ ] | Sandbox completamente aislado: restaurantId separado, Cal.com no afectado, emails no enviados
+[ ] | Claves test (res_test_) bloqueadas en entorno de producción (NODE_ENV=production)
+[ ] | Google Reserve marcado como 'Próximamente' en el dashboard (no en MVP)
+[ ] | Integración Zapier documentada como webhook genérico; app oficial en marketplace = Fase 2
+[ ] | Modal de consentimiento informado antes de activar cualquier integración (Ley 1581)
+[ ] | Mapeo de campos POS configurado por restaurante en tabla PosTableMapping
+[ ] | Documentación OpenAPI generada desde schemas Zod (@asteasolutions/zod-to-openapi) — nunca manual
+[ ] | SDK de Node.js lanza AntigravityApiError para respuestas HTTP no-OK (no retorna error silenciosamente)
+[ ] | SDK incluye manejo de rate limiting: retry automático con espera cuando recibe 429
+[ ] | Política de versionado documentada: sunset headers, 6 meses de aviso, 12 meses de soporte v1 post-v2
+[ ] | Playground distingue visualmente entre claves live y test (badges de color)
+[ ] | Guía de inicio rápido (Quick Start) para 3 casos de uso: POS, Zapier via webhook, Google Maps
+[ ] | ApiKey incluye campo expiresAt para rotación programada y lastUsedAt para detectar claves abandonadas
+[ ] | Activación de cada integración registrada en ConsentRecord con timestamp y versión de política (Ley 1581)
+[ ] | Claves con 90+ días sin uso notificadas al dueño del restaurante para revisión
+[ ] | Datos de clientes en payload de webhook anonimizados antes de almacenar en logs
+[ ] | Flujo completo: POS crea reserva via API → aparece en Cal.com → aparece en Dashboard (tiempo real via Pusher)
+[ ] | Flujo: webhook saliente con endpoint caído → 3 reintentos con backoff → auto-suspensión → email al dueño
+[ ] | Prueba de seguridad: API Key de restaurante A intenta actualizar reserva de restaurante B → debe retornar 404
+[ ] | Prueba de seguridad: request sin firma HMAC al webhook entrante → debe retornar 401
+[ ] | Prueba de rate limiting: superar el límite del plan Free → debe retornar 429 con headers X-RateLimit-*
+[ ] | Prueba del sandbox: crear reserva con clave test → no aparece en Cal.com live, no dispara email real
+[ ] | Prueba de deduplicación: simular fallo y reintento de BullMQ → el webhook saliente se entrega exactamente una vez
+[ ] | Verificar que el SDK de Node.js lanza excepción correctamente para 400, 429 y 500

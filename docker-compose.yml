@@ -1,0 +1,61 @@
+version: '3.8'
+
+volumes:
+  calcom-db-data:
+  calcom-redis-data:
+
+networks:
+  calcom-network:
+    name: calcom-network
+    driver: bridge
+
+services:
+  database:
+    container_name: calcom-database
+    image: postgres:15-alpine
+    restart: always
+    volumes:
+      - calcom-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=unicorn_user
+      - POSTGRES_PASSWORD=magical_password
+      - POSTGRES_DB=calendso
+    networks:
+      - calcom-network
+    ports:
+      - "5450:5432"
+
+  redis:
+    container_name: calcom-redis
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - calcom-redis-data:/data
+    networks:
+      - calcom-network
+    ports:
+      - "6379:6379"
+
+  calcom:
+    container_name: calcom-app
+    image: calcom/cal.diy:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - database
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://unicorn_user:magical_password@database:5432/calendso
+      - DATABASE_DIRECT_URL=postgresql://unicorn_user:magical_password@database:5432/calendso
+      - NEXT_PUBLIC_WEBAPP_URL=http://localhost:3001
+      - NEXT_PUBLIC_WEBSITE_URL=http://localhost:3001
+      - NEXTAUTH_URL=http://localhost:3001
+      - NEXTAUTH_SECRET=secret_must_be_changed_in_prod_32_chars_long_123
+      - CALENDSO_ENCRYPTION_KEY=encryption_must_be_changed_in_prod_32_chars_12
+      - CALCOM_TELEMETRY_DISABLED=1
+      - CRON_API_KEY=cron_api_key_placeholder
+      - GOOGLE_LOGIN_ENABLED=false
+      - OUTLOOK_LOGIN_ENABLED=false
+    networks:
+      - calcom-network

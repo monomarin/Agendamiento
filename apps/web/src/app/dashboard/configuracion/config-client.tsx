@@ -4,7 +4,7 @@ import * as React from "react"
 import {
   Key, Webhook, ToyBrick, Plus, Trash2, Clipboard, ClipboardCheck,
   RefreshCw, Check, AlertTriangle, Eye, ArrowRight, ShieldAlert,
-  Calendar, CheckCircle, HelpCircle, Save, ExternalLink
+  Calendar, CheckCircle, HelpCircle, Save, ExternalLink, Building2, Edit2, X
 } from "lucide-react"
 
 interface TableProp {
@@ -46,11 +46,21 @@ interface MappingProp {
   posTableNumber: string
 }
 
+interface BranchProp {
+  id: string
+  name: string
+  address: string
+  phone: string | null
+  isActive: boolean
+  createdAt: string
+}
+
 interface ConfigClientProps {
   initialApiKeys: ApiKeyProp[]
   initialWebhooks: WebhookProp[]
   initialTables: TableProp[]
   initialMappings: MappingProp[]
+  initialBranches?: BranchProp[]
   restaurantId: string
   restaurantName: string
   restaurantSlug: string
@@ -62,12 +72,13 @@ export default function ConfigClient({
   initialWebhooks,
   initialTables,
   initialMappings,
+  initialBranches = [],
   restaurantId,
   restaurantName,
   restaurantSlug,
   ownerEmail,
 }: ConfigClientProps) {
-  const [activeTab, setActiveTab] = React.useState<"keys" | "webhooks" | "integrations">("keys")
+  const [activeTab, setActiveTab] = React.useState<"sedes" | "keys" | "webhooks" | "integrations">("sedes")
 
   // API Keys State
   const [apiKeys, setApiKeys] = React.useState<ApiKeyProp[]>(initialApiKeys)
@@ -100,6 +111,18 @@ export default function ConfigClient({
   const [isLoadingLogs, setIsLoadingLogs] = React.useState(false)
   const [selectedLogPayload, setSelectedLogPayload] = React.useState<any | null>(null)
 
+  // Branches State
+  const [branches, setBranches] = React.useState<BranchProp[]>(initialBranches)
+  const [newBranchName, setNewBranchName] = React.useState("")
+  const [newBranchAddress, setNewBranchAddress] = React.useState("")
+  const [newBranchPhone, setNewBranchPhone] = React.useState("")
+  const [showAddBranch, setShowAddBranch] = React.useState(false)
+  const [editingBranchId, setEditingBranchId] = React.useState<string | null>(null)
+  const [editBranchName, setEditBranchName] = React.useState("")
+  const [editBranchAddress, setEditBranchAddress] = React.useState("")
+  const [editBranchPhone, setEditBranchPhone] = React.useState("")
+  const [isSavingBranch, setIsSavingBranch] = React.useState(false)
+
   // POS Mappings State
   const [tableMappings, setTableMappings] = React.useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {}
@@ -129,6 +152,61 @@ export default function ConfigClient({
       fetchLogs()
     }
   }, [activeTab, logStatus, logWebhookId, logStartDate, logEndDate])
+
+  // --- Branch handlers ---
+  const handleCreateBranch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newBranchName.trim() || !newBranchAddress.trim()) return
+    setIsSavingBranch(true)
+    try {
+      const res = await fetch("/api/dashboard/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newBranchName, address: newBranchAddress, phone: newBranchPhone }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setBranches([...branches, json])
+        setNewBranchName("")
+        setNewBranchAddress("")
+        setNewBranchPhone("")
+        setShowAddBranch(false)
+      } else {
+        alert(json.message || "Error al crear sede")
+      }
+    } catch { alert("Error de red") } finally { setIsSavingBranch(false) }
+  }
+
+  const handleUpdateBranch = async (id: string) => {
+    setIsSavingBranch(true)
+    try {
+      const res = await fetch(`/api/dashboard/branches/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editBranchName, address: editBranchAddress, phone: editBranchPhone }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setBranches(branches.map(b => b.id === id ? { ...b, name: editBranchName, address: editBranchAddress, phone: editBranchPhone } : b))
+        setEditingBranchId(null)
+      } else {
+        alert(json.message || "Error al actualizar")
+      }
+    } catch { alert("Error de red") } finally { setIsSavingBranch(false) }
+  }
+
+  const handleDeleteBranch = async (id: string) => {
+    if (!confirm("¿Eliminar esta sede y todas sus zonas y mesas?")) return
+    try {
+      const res = await fetch(`/api/dashboard/branches/${id}`, { method: "DELETE" })
+      const json = await res.json()
+      if (res.ok) {
+        setBranches(branches.filter(b => b.id !== id))
+      } else {
+        alert(json.message || "Error al eliminar")
+      }
+    } catch { alert("Error de red") }
+  }
 
   // --- Handlers para API Keys ---
   const handleCreateApiKey = async (e: React.FormEvent) => {
@@ -422,6 +500,15 @@ export default function ConfigClient({
         </div>
         <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-1">
           <button
+            onClick={() => setActiveTab("sedes")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === "sedes" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            Sedes
+          </button>
+          <button
             onClick={() => setActiveTab("keys")}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
               activeTab === "keys" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
@@ -450,6 +537,120 @@ export default function ConfigClient({
           </button>
         </div>
       </div>
+
+      {/* --- TAB 0: SEDES --- */}
+      {activeTab === "sedes" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-red-500" />
+              Gestión de Sedes
+            </h2>
+            <button
+              onClick={() => setShowAddBranch(!showAddBranch)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-all shadow-lg shadow-red-600/15"
+            >
+              <Plus className="w-4 h-4" />
+              Agregar Sede
+            </button>
+          </div>
+
+          {/* Add Branch Form */}
+          {showAddBranch && (
+            <div className="p-5 rounded-2xl border border-red-500/20 bg-red-500/5 space-y-4">
+              <h3 className="font-semibold text-white text-sm">Nueva Sede</h3>
+              <form onSubmit={handleCreateBranch} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-neutral-400 mb-1">Nombre *</label>
+                    <input
+                      required
+                      value={newBranchName}
+                      onChange={(e) => setNewBranchName(e.target.value)}
+                      placeholder="ej. Sede Norte"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-neutral-400 mb-1">Teléfono</label>
+                    <input
+                      value={newBranchPhone}
+                      onChange={(e) => setNewBranchPhone(e.target.value)}
+                      placeholder="+57 300 000 0000"
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Dirección *</label>
+                  <input
+                    required
+                    value={newBranchAddress}
+                    onChange={(e) => setNewBranchAddress(e.target.value)}
+                    placeholder="Calle 123 # 45-67, Ciudad"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={() => setShowAddBranch(false)} className="px-4 py-2 rounded-xl text-sm text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors">Cancelar</button>
+                  <button type="submit" disabled={isSavingBranch} className="px-5 py-2 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-500 text-white disabled:opacity-50">Guardar Sede</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Branches List */}
+          <div className="space-y-3">
+            {branches.length === 0 ? (
+              <div className="p-12 text-center border border-dashed border-neutral-800 rounded-2xl text-neutral-500 text-sm">No hay sedes configuradas.</div>
+            ) : branches.map((branch) => (
+              <div key={branch.id} className="p-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 space-y-3">
+                {editingBranchId === branch.id ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input value={editBranchName} onChange={(e) => setEditBranchName(e.target.value)} className="bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                      <input value={editBranchPhone} onChange={(e) => setEditBranchPhone(e.target.value)} placeholder="Teléfono" className="bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    </div>
+                    <input value={editBranchAddress} onChange={(e) => setEditBranchAddress(e.target.value)} className="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500" />
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => setEditingBranchId(null)} className="px-3 py-1.5 rounded-lg text-sm text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1"><X className="w-3.5 h-3.5" />Cancelar</button>
+                      <button onClick={() => handleUpdateBranch(branch.id)} disabled={isSavingBranch} className="px-4 py-1.5 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 flex items-center gap-1"><Save className="w-3.5 h-3.5" />Guardar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-white flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-red-500" />
+                        {branch.name}
+                        {!branch.isActive && <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500">INACTIVA</span>}
+                      </p>
+                      <p className="text-xs text-neutral-500">{branch.address}</p>
+                      {branch.phone && <p className="text-xs text-neutral-500">{branch.phone}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => { setEditingBranchId(branch.id); setEditBranchName(branch.name); setEditBranchAddress(branch.address); setEditBranchPhone(branch.phone || "") }}
+                        className="p-2 rounded-xl text-neutral-500 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                        title="Editar sede"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBranch(branch.id)}
+                        className="p-2 rounded-xl text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Eliminar sede"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* --- TAB 1: CLAVES API --- */}
       {activeTab === "keys" && (

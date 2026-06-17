@@ -5,6 +5,7 @@ import { Phone, ShieldCheck } from "lucide-react"
 
 import prisma from "@/lib/prisma"
 import { ReactQueryProvider } from "@/lib/query-client"
+import { StepIndicator } from "@/components/booking/step-indicator"
 
 interface BookingLayoutProps {
   children: React.ReactNode
@@ -118,26 +119,7 @@ export default async function BookingLayout({ children, params }: BookingLayoutP
         <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 md:py-12 flex flex-col gap-6 z-10">
           {/* Step Progress Bar */}
           <div className="w-full bg-neutral-900/30 border border-neutral-900 rounded-2xl p-4 backdrop-blur-xl">
-            <div className="flex items-center justify-between relative">
-              {/* Background line */}
-              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-neutral-800 z-0" />
-              {BOOKING_STEPS.map((step, idx) => (
-                <div key={step.id} className="flex flex-col items-center relative z-10">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs border transition-all duration-300 bg-neutral-950`}
-                    style={{
-                      borderColor: "var(--primary)",
-                      opacity: 0.4,
-                    }}
-                  >
-                    {step.label}
-                  </div>
-                  <span className="hidden sm:inline-block text-[9px] mt-1.5 text-neutral-600 tracking-wide">
-                    {step.label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <StepIndicator steps={BOOKING_STEPS} primaryColor={restaurant.primaryColor} />
           </div>
 
           {/* Content card */}

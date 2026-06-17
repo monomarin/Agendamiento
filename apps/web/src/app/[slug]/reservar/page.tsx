@@ -23,9 +23,10 @@ export default async function ReservarRootPage({ params }: ReservarRootPageProps
     redirect("/")
   }
 
-  // Single branch → skip to step 1 directly
+  // Single branch → skip to step 1 directly, passing branchId as query param
   if (restaurant.branches.length <= 1) {
-    redirect(`/${slug}/reservar/personas`)
+    const branchId = restaurant.branches[0]?.id || ""
+    redirect(`/${slug}/reservar/personas?branchId=${branchId}`)
   }
 
   // Multiple branches → show branch selector

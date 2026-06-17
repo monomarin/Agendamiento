@@ -119,9 +119,16 @@ export async function POST(req: Request) {
         },
       })
 
-      // Create owner as first StaffMember as well
-      await tx.staffMember.create({
-        data: {
+      // Create or update owner as first StaffMember (upsert to avoid unique constraint on clerkUserId)
+      await tx.staffMember.upsert({
+        where: { clerkUserId },
+        update: {
+          restaurantId: restaurant.id,
+          email: user.emailAddresses?.[0]?.emailAddress || "",
+          name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Usuario",
+          role: "OWNER",
+        },
+        create: {
           restaurantId: restaurant.id,
           clerkUserId,
           email: user.emailAddresses?.[0]?.emailAddress || "",

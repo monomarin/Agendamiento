@@ -87,6 +87,16 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
   const [activeTable, setActiveTable] = useState<Table | null>(null)
   const [showTableDetailsModal, setShowTableDetailsModal] = useState<boolean>(false)
 
+  // Edit Table Modal
+  const [showEditTableModal, setShowEditTableModal] = useState<boolean>(false)
+  const [editTableNumber, setEditTableNumber] = useState<string>("")
+  const [editTableCapacity, setEditTableCapacity] = useState<number>(4)
+  const [editTableShape, setEditTableShape] = useState<string>("SQUARE")
+
+  // Rename Zone inline
+  const [renamingZoneId, setRenamingZoneId] = useState<string | null>(null)
+  const [renameZoneValue, setRenameZoneValue] = useState<string>("")
+
   // Unassigned Bookings Sidebar list
   const [unassignedBookings, setUnassignedBookings] = useState<any[]>([])
 
@@ -245,6 +255,58 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
         toast.error("Error al eliminar la mesa.")
       }
     } catch (err) {
+      toast.error("Error de red.")
+    }
+  }
+
+  const handleEditTable = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!activeTable) return
+    try {
+      const res = await fetch(`/api/dashboard/tables/${activeTable.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          number: editTableNumber,
+          capacity: editTableCapacity,
+          shape: editTableShape,
+        }),
+      })
+      const json = await res.json()
+      if (json.status === "success") {
+        toast.success(`Mesa actualizada con éxito.`)
+        setShowEditTableModal(false)
+        setShowTableDetailsModal(false)
+        setActiveTable(null)
+        fetchFloorPlanData()
+      } else {
+        toast.error(json.error || "No se pudo actualizar la mesa.")
+      }
+    } catch (err) {
+      toast.error("Error de red.")
+    }
+  }
+
+  const handleRenameZone = async (zoneId: string, newName: string) => {
+    if (!newName.trim()) {
+      setRenamingZoneId(null)
+      return
+    }
+    try {
+      const res = await fetch(`/api/dashboard/zones/${zoneId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      })
+      const json = await res.json()
+      if (json.status === "success") {
+        toast.success("Zona renombrada.")
+        setRenamingZoneId(null)
+        fetchFloorPlanData()
+      } else {
+        toast.error("Error al renombrar la zona.")
+      }
+    } catch {
       toast.error("Error de red.")
     }
   }
@@ -532,17 +594,41 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
           <div className="flex items-center justify-between bg-neutral-900/50 p-2 border border-neutral-800/80 rounded-2xl">
             <div className="flex items-center gap-1.5 overflow-x-auto">
               {zones.map((zone) => (
-                <button
-                  key={zone.id}
-                  onClick={() => setSelectedZoneId(zone.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    selectedZoneId === zone.id
-                      ? "bg-red-600 text-white shadow-lg shadow-red-600/15"
-                      : "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                  }`}
-                >
-                  {zone.name}
-                </button>
+                <div key={zone.id} className="flex items-center gap-1">
+                  {renamingZoneId === zone.id ? (
+                    <input
+                      autoFocus
+                      value={renameZoneValue}
+                      onChange={(e) => setRenameZoneValue(e.target.value)}
+                      onBlur={() => handleRenameZone(zone.id, renameZoneValue)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameZone(zone.id, renameZoneValue)
+                        if (e.key === "Escape") setRenamingZoneId(null)
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-neutral-800 border border-red-500 text-sm text-white focus:outline-none w-32"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setSelectedZoneId(zone.id)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        selectedZoneId === zone.id
+                          ? "bg-red-600 text-white shadow-lg shadow-red-600/15"
+                          : "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                      }`}
+                    >
+                      {zone.name}
+                    </button>
+                  )}
+                  {editMode && renamingZoneId !== zone.id && (
+                    <button
+                      onClick={() => { setRenamingZoneId(zone.id); setRenameZoneValue(zone.name) }}
+                      className="p-1 rounded-lg text-neutral-600 hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                      title="Renombrar zona"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               ))}
               {editMode && (
                 <button
@@ -664,7 +750,13 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
                         key={table.id}
                         onMouseDown={(e) => handleSvgMouseDown(e, table.id, table.x, table.y)}
                         onClick={() => {
-                          if (!editMode) {
+                          if (editMode) {
+                            setActiveTable(table)
+                            setEditTableNumber(table.number)
+                            setEditTableCapacity(table.capacity)
+                            setEditTableShape(table.shape)
+                            setShowEditTableModal(true)
+                          } else {
                             setActiveTable(table)
                             setShowTableDetailsModal(true)
                           }
@@ -1134,13 +1226,89 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
                 <Trash2 className="w-3.5 h-3.5" />
                 Eliminar Mesa
               </button>
-              <button
-                onClick={() => setShowTableDetailsModal(false)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
-              >
-                Cerrar
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditTableNumber(activeTable.number)
+                    setEditTableCapacity(activeTable.capacity)
+                    setEditTableShape(activeTable.shape)
+                    setShowEditTableModal(true)
+                  }}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-amber-400 hover:bg-amber-400/10 text-xs font-medium transition-colors"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Editar Mesa
+                </button>
+                <button
+                  onClick={() => setShowTableDetailsModal(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Table Modal */}
+      {showEditTableModal && activeTable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <h3 className="font-bold text-lg text-white">Editar Mesa {activeTable.number}</h3>
+            <form onSubmit={handleEditTable} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs text-neutral-400 font-medium">Número / Identificador</label>
+                  <input
+                    type="text"
+                    value={editTableNumber}
+                    onChange={(e) => setEditTableNumber(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-sm text-white focus:outline-none focus:border-red-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-neutral-400 font-medium">Capacidad (Comensales)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={editTableCapacity}
+                    onChange={(e) => setEditTableCapacity(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-sm text-white focus:outline-none focus:border-red-500"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-neutral-400 font-medium">Forma</label>
+                <select
+                  value={editTableShape}
+                  onChange={(e) => setEditTableShape(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-sm text-white focus:outline-none focus:border-red-500"
+                >
+                  <option value="ROUND">Circular</option>
+                  <option value="SQUARE">Cuadrada</option>
+                  <option value="RECTANGLE">Rectangular</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditTableModal(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition-all"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -183,7 +183,7 @@ export function StepTableTypes() {
               </span>
             ) : (
               localTypes.flatMap((type, typeIdx) =>
-                Array.from({ length: Math.min(type.quantity, 6) }).map((_, seatIdx) => {
+                Array.from({ length: type.quantity }).map((_, seatIdx) => {
                   const isCircle = typeIdx % 2 === 0
                   return (
                     <div
@@ -207,7 +207,7 @@ export function StepTableTypes() {
             )}
           </div>
           <p className="text-[10px] text-neutral-500 leading-normal">
-            * Se muestran hasta 6 mesas de muestra de cada categoría. Las mesas redondas y cuadradas optimizan el espacio en tu Floor Plan digital.
+            * Se muestran todas las mesas de cada categoría. Las mesas redondas y cuadradas optimizan el espacio en tu Floor Plan digital.
           </p>
         </div>
       </div>

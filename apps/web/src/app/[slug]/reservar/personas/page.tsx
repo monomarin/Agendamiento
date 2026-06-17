@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Users, ChevronRight, Minus, Plus, MessageSquare } from "lucide-react"
 
 import { useBookingStore } from "@/lib/booking-store"
@@ -35,6 +35,13 @@ const PARTY_MESSAGES: Record<string, string> = {
   "6": "Mesa para grupo",
   "7": "Mesa grande",
   "8": "Mesa grande",
+  "9": "Mesa grande",
+  "10": "Evento especial",
+  "11": "Evento especial",
+  "12": "Evento especial",
+  "13": "Evento especial",
+  "14": "Evento especial",
+  "15": "Evento especial",
 }
 
 interface PersonasPageProps {
@@ -43,17 +50,28 @@ interface PersonasPageProps {
 
 export default function PersonasPage({ params }: PersonasPageProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { slug } = React.use(params)
 
   const {
     partySize,
     eventType,
     specialRequests,
+    selectedBranchId,
     setPartySize,
     setEventType,
     setSpecialRequests,
+    setSelectedBranchId,
     setStep,
   } = useBookingStore()
+
+  // Auto-set branchId from URL query param (single-branch redirect)
+  React.useEffect(() => {
+    const branchIdParam = searchParams.get("branchId")
+    if (branchIdParam && !selectedBranchId) {
+      setSelectedBranchId(branchIdParam)
+    }
+  }, [searchParams, selectedBranchId, setSelectedBranchId])
 
   const [showMoreInput, setShowMoreInput] = React.useState(partySize > 8)
   const [birthdayName, setBirthdayName] = React.useState("")
@@ -110,8 +128,8 @@ export default function PersonasPage({ params }: PersonasPageProps) {
     router.push(`/${slug}/reservar/fecha`)
   }
 
-  const partyMessage = partySize > 8
-    ? "Evento especial — te contactaremos"
+  const partyMessage = partySize > 15
+    ? "Evento especial — te contactaremos por WhatsApp"
     : PARTY_MESSAGES[String(partySize)] || "Mesa para grupo"
 
   return (
@@ -180,9 +198,9 @@ export default function PersonasPage({ params }: PersonasPageProps) {
           </div>
         )}
 
-        {partySize > 10 ? (
+        {partySize > 15 ? (
           <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
-            <span>Para grupos de +10 personas, te contactaremos para coordinar.</span>
+            <span>Para grupos de +15 personas, contáctanos por WhatsApp para coordinar.</span>
             <a
               href="https://wa.me/"
               className="shrink-0 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-semibold transition-colors"
@@ -313,7 +331,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
         <Button
           id="personas-continue"
           onClick={handleContinue}
-          disabled={partySize > 10}
+          disabled={partySize > 15}
           className="px-8 py-2.5 font-semibold gap-2 bg-[var(--primary)] hover:opacity-90 text-white shadow-[0_0_20px_var(--primary)/25] transition-all duration-200"
         >
           Elegir fecha y hora

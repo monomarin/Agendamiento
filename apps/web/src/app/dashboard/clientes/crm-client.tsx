@@ -6,7 +6,7 @@ import {
   Users, Search, Filter, Calendar, DollarSign,
   User, CheckCircle2, AlertTriangle, ChevronRight,
   Plus, X, Save, Edit3, Tag, MessageSquare, Clipboard,
-  RefreshCw
+  RefreshCw, Trash2
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -179,6 +179,27 @@ export default function CrmClient({ restaurantId }: CrmClientProps) {
     setEditTags(editTags.filter(t => t !== tagName))
   }
 
+  const handleDeleteCustomer = async () => {
+    if (!selectedCustomerId || !customerDetail) return
+    if (!confirm(`¿Estás seguro de eliminar a ${customerDetail.customer.name}? Esta acción no se puede deshacer.`)) return
+    try {
+      const res = await fetch(`/api/dashboard/customers/${selectedCustomerId}`, {
+        method: "DELETE",
+      })
+      const json = await res.json()
+      if (json.status === "success" || res.ok) {
+        toast.success("Cliente eliminado.")
+        setSelectedCustomerId(null)
+        setCustomerDetail(null)
+        fetchCustomers()
+      } else {
+        toast.error(json.error || "Error al eliminar el cliente.")
+      }
+    } catch (err) {
+      toast.error("Error de red.")
+    }
+  }
+
   const handlePreferenceChange = (key: string, value: string) => {
     setEditPreferences(prev => prev.map(p => p.key === key ? { ...p, value } : p))
   }
@@ -327,7 +348,7 @@ export default function CrmClient({ restaurantId }: CrmClientProps) {
                   <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-red-600/10">
                     {customerDetail.customer.name.charAt(0)}
                   </div>
-                  <div className="min-w-0 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <h2 className="font-bold text-sm text-white truncate">{customerDetail.customer.name}</h2>
                     <p className="text-[10px] text-neutral-500 truncate">{customerDetail.customer.email}</p>
                     <p className="text-[10px] text-neutral-500">{customerDetail.customer.phone || "Sin teléfono registrado"}</p>
@@ -335,6 +356,13 @@ export default function CrmClient({ restaurantId }: CrmClientProps) {
                       {customerDetail.stats.segment}
                     </span>
                   </div>
+                  <button
+                    onClick={handleDeleteCustomer}
+                    title="Eliminar cliente"
+                    className="p-2 rounded-xl text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
                 {/* Tabs bar */}

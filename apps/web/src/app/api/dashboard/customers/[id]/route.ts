@@ -238,3 +238,46 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
+
+/**
+ * DELETE /api/dashboard/customers/[id]
+ * Deletes a customer and their associated data.
+ */
+export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { clerkUserId: userId },
+    select: { restaurantId: true },
+  })
+
+  if (!user?.restaurantId) {
+    return NextResponse.json({ error: "Restaurant not found" }, { status: 404 })
+  }
+
+  const { id } = await params
+
+  try {
+    // Verify customer has at least one booking in this restaurant (ownership check)
+    const customerExists = await prisma.customer.findFirst({
+      where: {
+        id,
+        bookings: { some: { branch: { restaurantId: user.restaurantId } } },
+      },
+    })
+
+    if (!customerExists) {
+      return NextResponse.json({ error: "Customer not found or unauthorized" }, { status: 404 })
+    }
+
+    await prisma.customer.delete({ where: { id } })
+
+    return NextResponse.json({ status: "success", message: "Cliente eliminado correctamente." })
+  } catch (err) {
+    console.error("[Dashboard Customers ID DELETE] Error:", err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}

@@ -36,8 +36,8 @@ export default async function ConfiguracionPage() {
   const restaurantSlug = user.restaurant.slug
   const ownerEmail = user.email
 
-  // Consultar Claves API, Webhooks, Mesas Físicas y Mapeos del POS de forma paralela
-  const [apiKeys, webhooks, tables, posMappings] = await Promise.all([
+  // Consultar Claves API, Webhooks, Mesas Físicas, Mapeos del POS y Sedes de forma paralela
+  const [apiKeys, webhooks, tables, posMappings, branches] = await Promise.all([
     prisma.apiKey.findMany({
       where: { restaurantId },
       orderBy: { createdAt: "desc" },
@@ -77,6 +77,10 @@ export default async function ConfiguracionPage() {
     }),
     prisma.posTableMapping.findMany({
       where: { restaurantId },
+    }),
+    prisma.branch.findMany({
+      where: { restaurantId },
+      orderBy: { createdAt: "asc" },
     }),
   ])
 
@@ -120,12 +124,22 @@ export default async function ConfiguracionPage() {
     posTableNumber: m.posTableNumber,
   }))
 
+  const formattedBranches = branches.map((b) => ({
+    id: b.id,
+    name: b.name,
+    address: b.address,
+    phone: b.phone,
+    isActive: b.isActive,
+    createdAt: b.createdAt.toISOString(),
+  }))
+
   return (
     <ConfigClient
       initialApiKeys={formattedApiKeys}
       initialWebhooks={formattedWebhooks}
       initialTables={formattedTables}
       initialMappings={formattedMappings}
+      initialBranches={formattedBranches}
       restaurantId={restaurantId}
       restaurantName={restaurantName}
       restaurantSlug={restaurantSlug}

@@ -42,9 +42,10 @@ export async function POST(req: Request) {
       // Real-time transcript update
       if (call?.id && transcript) {
         // Store partial transcript in Redis (TTL 1h)
-        const { Redis } = await import("@upstash/redis")
-        const redis = Redis.fromEnv()
-        await redis.setex(`vapi-transcript:${call.id}`, 3600, transcript)
+        const { redis } = await import("@/lib/redis")
+        if (redis) {
+          await redis.setex(`vapi-transcript:${call.id}`, 3600, transcript)
+        }
       }
       break
     }

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
 export const dynamic = "force-dynamic"
-import { Redis } from "@upstash/redis"
+import { redis } from "@/lib/redis"
 import prisma from "@/lib/prisma"
 
-const redis = Redis.fromEnv()
 const CACHE_TTL = 2 * 60 // 2 minutes for month summary
 
 export async function GET(req: Request) {
@@ -18,7 +17,7 @@ export async function GET(req: Request) {
   }
 
   const cacheKey = `month-summary:${branchId}:${year}-${month}:${partySize}`
-  const cached = await redis.get(cacheKey)
+  const cached = redis ? await redis.get(cacheKey) : null
   if (cached) {
     return NextResponse.json(cached, { headers: { "X-Cache": "HIT" } })
   }
@@ -82,7 +81,7 @@ export async function GET(req: Request) {
       summary[dateStr] = ratio >= 1 ? "full" : ratio >= 0.7 ? "partial" : "available"
     }
 
-    await redis.setex(cacheKey, CACHE_TTL, summary)
+    if (redis) await redis.setex(cacheKey, CACHE_TTL, summary)
     return NextResponse.json(summary)
   } catch (err: any) {
     console.error("[Month summary error]:", err)

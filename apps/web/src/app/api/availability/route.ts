@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
+import { redis } from "@/lib/redis"
 import prisma from "@/lib/prisma"
 
-const redis = Redis.fromEnv()
 const CACHE_TTL = 60 // seconds
 
 export async function GET(req: Request) {
@@ -17,7 +16,7 @@ export async function GET(req: Request) {
 
   // ── Cache key ──
   const cacheKey = `availability:${branchId}:${date}:${partySize}`
-  const cached = await redis.get(cacheKey)
+  const cached = redis ? await redis.get(cacheKey) : null
   if (cached) {
     return NextResponse.json(cached, {
       headers: { "X-Cache": "HIT" },
@@ -49,7 +48,7 @@ export async function GET(req: Request) {
 
     if (!schedule || schedule.isClosed) {
       const result = { date, level: "closed", slots: [] }
-      await redis.setex(cacheKey, CACHE_TTL, result)
+      if (redis) await redis.setex(cacheKey, CACHE_TTL, result)
       return NextResponse.json(result)
     }
 
@@ -139,7 +138,7 @@ export async function GET(req: Request) {
 
     const result = { date, level, slots: slotData }
 
-    await redis.setex(cacheKey, CACHE_TTL, result)
+    if (redis) await redis.setex(cacheKey, CACHE_TTL, result)
     return NextResponse.json(result)
   } catch (error: any) {
     console.error("[Availability API Error]:", error)

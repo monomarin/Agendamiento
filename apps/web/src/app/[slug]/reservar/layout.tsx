@@ -67,6 +67,18 @@ export default async function BookingLayout({ children, params }: BookingLayoutP
         style={brandThemeStyle}
         className="min-h-screen bg-neutral-950 text-white flex flex-col antialiased relative selection:bg-[var(--primary)] selection:text-white"
       >
+        {/* Background image if configured */}
+        {restaurant.bannerUrl && (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.07] pointer-events-none z-0"
+            style={{
+              backgroundImage: `url(${restaurant.bannerUrl})`,
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.1) 75%, rgba(0,0,0,0) 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.1) 75%, rgba(0,0,0,0) 100%)",
+            }}
+          />
+        )}
+
         {/* Background ambient lighting */}
         <div
           className="absolute top-0 left-1/4 w-[600px] h-[300px] rounded-full opacity-10 blur-[120px] pointer-events-none transition-all duration-1000"

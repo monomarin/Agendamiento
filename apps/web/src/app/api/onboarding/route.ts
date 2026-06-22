@@ -97,6 +97,8 @@ export async function POST(req: Request) {
           type: restaurantInfo.type,
           email: restaurantInfo.email.toLowerCase(),
           description: restaurantInfo.description || null,
+          logoUrl: restaurantInfo.logoUrl || null,
+          bannerUrl: restaurantInfo.bannerUrl || null,
           primaryColor: restaurantInfo.primaryColor,
           secondaryColor: restaurantInfo.secondaryColor,
           timezone: restaurantInfo.timezone || "America/Bogota",

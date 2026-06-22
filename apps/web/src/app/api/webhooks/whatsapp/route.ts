@@ -1,16 +1,9 @@
 import crypto from "crypto"
 import { NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
-import { Ratelimit } from "@upstash/ratelimit"
+import { redis, getRatelimit } from "@/lib/redis"
 import prisma from "@/lib/prisma"
 
-const redis = Redis.fromEnv()
-
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(1000, "1 m"),
-  prefix: "whatsapp-webhook",
-})
+const ratelimit = getRatelimit(1000, "1 m", "whatsapp-webhook")
 
 // ── Verify Meta X-Hub-Signature-256 ──
 function verifyMetaSignature(payload: string, signature: string): boolean {
@@ -109,9 +102,12 @@ export async function POST(req: Request) {
 
   // ── Rate limit per restaurant (100 conversations/day in free plan) ──
   const restaurantRateKey = `whatsapp-restaurant:${restaurantId}`
-  const restaurantUsage = (await redis.incr(restaurantRateKey)) as number
-  if (restaurantUsage === 1) {
-    await redis.expire(restaurantRateKey, 86400) // Reset daily
+  let restaurantUsage = 0
+  if (redis) {
+    restaurantUsage = (await redis.incr(restaurantRateKey)) as number
+    if (restaurantUsage === 1) {
+      await redis.expire(restaurantRateKey, 86400) // Reset daily
+    }
   }
   if (restaurantUsage > 100) {
     console.warn(`[WhatsApp] Restaurant ${restaurantId} exceeded daily limit`)
@@ -120,7 +116,7 @@ export async function POST(req: Request) {
 
   // ── Load or initialize conversation from Redis ──
   const convKey = `conversation:${restaurantId}:${fromPhone}`
-  const existingConv: any[] = (await redis.get(convKey)) || []
+  const existingConv: any[] = redis ? (await redis.get(convKey)) || [] : []
   
   // Check first-message consent requirement
   const isFirstMessage = existingConv.length === 0
@@ -167,7 +163,7 @@ export async function POST(req: Request) {
   existingConv.push({ role: "assistant", content: replyText })
 
   // Save conversation to Redis with 24h TTL
-  await redis.setex(convKey, 86400, existingConv)
+  if (redis) await redis.setex(convKey, 86400, existingConv)
 
   // ── Save conversation log to DB (async-safe) ──
   await prisma.communicationLog.create({
@@ -189,7 +185,7 @@ export async function POST(req: Request) {
 // ── Helper: Build system prompt (cached 10 min in Redis) ──
 async function buildSystemPrompt(restaurantId: string, restaurant: any): Promise<string> {
   const cacheKey = `system-prompt:${restaurantId}`
-  const cached = await redis.get(cacheKey)
+  const cached = redis ? await redis.get(cacheKey) : null
   if (cached) return cached as string
 
   const branch = restaurant.branches?.[0]
@@ -230,7 +226,7 @@ FLUJO DE RESERVA:
 4. Crea la reserva con create_reservation.
 5. Confirma los detalles y el código de confirmación.`
 
-  await redis.setex(cacheKey, 600, prompt) // 10 min cache
+  if (redis) await redis.setex(cacheKey, 600, prompt) // 10 min cache
   return prompt
 }
 

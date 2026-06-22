@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   LayoutGrid, Plus, Edit2, Play, Trash2, CheckCircle2,
-  XCircle, UserPlus, ZoomIn, ZoomOut, RotateCcw,
+  XCircle, UserPlus, ZoomIn, ZoomOut, RotateCcw, Scissors,
   Sparkles, Layers, RefreshCw, AlertTriangle
 } from "lucide-react"
 import { toast } from "sonner"
@@ -102,6 +102,73 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
 
   // Drag State for Tables (within SVG Canvas)
   const [draggingTable, setDraggingTable] = useState<{ id: string; startX: number; startY: number } | null>(null)
+
+  // Divider Lines state
+  interface DividerLine {
+    id: string
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  }
+  const [dividers, setDividers] = useState<DividerLine[]>([])
+  const [drawingLineMode, setDrawingLineMode] = useState(false)
+  const [tempLineStart, setTempLineStart] = useState<{ x: number; y: number } | null>(null)
+  const [currentMousePos, setCurrentMousePos] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (selectedZoneId) {
+      const stored = localStorage.getItem(`floorplan-dividers:${selectedZoneId}`)
+      if (stored) {
+        try {
+          setDividers(JSON.parse(stored))
+        } catch {
+          setDividers([])
+        }
+      } else {
+        setDividers([])
+      }
+    }
+  }, [selectedZoneId])
+
+  const saveDividers = (newDividers: DividerLine[]) => {
+    setDividers(newDividers)
+    if (selectedZoneId) {
+      localStorage.setItem(`floorplan-dividers:${selectedZoneId}`, JSON.stringify(newDividers))
+    }
+  }
+
+  const handleDeleteDivider = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const filtered = dividers.filter(d => d.id !== id)
+    saveDividers(filtered)
+    toast.success("Línea eliminada.")
+  }
+
+  const handleBackgroundClick = (e: React.MouseEvent<SVGElement>) => {
+    if (!editMode || !drawingLineMode) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Math.round((e.clientX - rect.left) / scale)
+    const y = Math.round((e.clientY - rect.top) / scale)
+
+    if (!tempLineStart) {
+      setTempLineStart({ x, y })
+      setCurrentMousePos({ x, y })
+    } else {
+      const newLine: DividerLine = {
+        id: Math.random().toString(36).substring(2, 9),
+        x1: tempLineStart.x,
+        y1: tempLineStart.y,
+        x2: x,
+        y2: y,
+      }
+      saveDividers([...dividers, newLine])
+      setTempLineStart(null)
+      setCurrentMousePos(null)
+      setDrawingLineMode(false)
+      toast.success("Línea divisoria trazada.")
+    }
+  }
 
   // Load selected branch first
   useEffect(() => {
@@ -326,6 +393,13 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
   }
 
   const handleSvgMouseMove = (e: React.MouseEvent<SVGElement>) => {
+    if (drawingLineMode && tempLineStart) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const x = Math.round((e.clientX - rect.left) / scale)
+      const y = Math.round((e.clientY - rect.top) / scale)
+      setCurrentMousePos({ x, y })
+      return
+    }
     if (!draggingTable) return
     const activeZone = zones.find(z => z.id === selectedZoneId)
     if (!activeZone) return
@@ -679,13 +753,44 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
                   <RotateCcw className="w-4 h-4" />
                 </button>
                 {editMode && (
-                  <button
-                    onClick={() => setShowAddTableModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Nueva Mesa
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        setDrawingLineMode(!drawingLineMode)
+                        setTempLineStart(null)
+                        setCurrentMousePos(null)
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-md transition-all ${
+                        drawingLineMode 
+                          ? "bg-amber-600 hover:bg-amber-500 text-white" 
+                          : "bg-neutral-800 hover:bg-neutral-700 text-neutral-200"
+                      }`}
+                      title="Haz click en un punto del plano y luego en otro para trazar una línea divisoria"
+                    >
+                      <Scissors className="w-3.5 h-3.5" />
+                      {drawingLineMode ? "Dibujando..." : "Dibujar Línea"}
+                    </button>
+                    {dividers.length > 0 && (
+                      <button
+                        onClick={() => {
+                          if (confirm("¿Borrar todas las líneas divisorias de esta zona?")) {
+                            saveDividers([])
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900/60 hover:bg-neutral-800 text-red-400 hover:text-red-300 text-xs font-semibold border border-neutral-800 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Limpiar Líneas
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowAddTableModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold shadow-md transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Nueva Mesa
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -718,7 +823,70 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
                       <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#000000" floodOpacity="0.5" />
                     </filter>
                   </defs>
-                  <rect width={activeZone.width} height={activeZone.height} fill="url(#grid)" />
+                  <rect
+                    width={activeZone.width}
+                    height={activeZone.height}
+                    fill="url(#grid)"
+                    onClick={handleBackgroundClick}
+                    style={{ cursor: drawingLineMode ? "crosshair" : "default" }}
+                  />
+
+                  {/* Render Divider Lines */}
+                  {dividers.map((line) => {
+                    const midX = (line.x1 + line.x2) / 2
+                    const midY = (line.y1 + line.y2) / 2
+                    return (
+                      <g key={line.id}>
+                        <line
+                          x1={line.x1}
+                          y1={line.y1}
+                          x2={line.x2}
+                          y2={line.y2}
+                          stroke="#525252"
+                          strokeWidth="3"
+                          strokeDasharray="6,6"
+                          opacity="0.8"
+                        />
+                        {editMode && (
+                          <g
+                            transform={`translate(${midX}, ${midY})`}
+                            onClick={(e) => handleDeleteDivider(line.id, e)}
+                            className="cursor-pointer"
+                          >
+                            <circle
+                              r="8"
+                              fill="#ef4444"
+                              opacity="0.6"
+                            />
+                            <text
+                              x="0"
+                              y="3"
+                              fill="#ffffff"
+                              fontSize="9px"
+                              fontWeight="bold"
+                              textAnchor="middle"
+                            >
+                              ×
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    )
+                  })}
+
+                  {/* Preview Line */}
+                  {drawingLineMode && tempLineStart && currentMousePos && (
+                    <line
+                      x1={tempLineStart.x}
+                      y1={tempLineStart.y}
+                      x2={currentMousePos.x}
+                      y2={currentMousePos.y}
+                      stroke="#fbbf24"
+                      strokeWidth="3"
+                      strokeDasharray="6,6"
+                      className="animate-pulse"
+                    />
+                  )}
 
                   {/* Render Tables */}
                   {activeZone.tables.map((table) => {

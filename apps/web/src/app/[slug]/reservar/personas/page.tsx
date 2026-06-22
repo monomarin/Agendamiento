@@ -73,7 +73,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
     }
   }, [searchParams, selectedBranchId, setSelectedBranchId])
 
-  const [showMoreInput, setShowMoreInput] = React.useState(partySize > 8)
+  const [showMoreInput, setShowMoreInput] = React.useState(partySize > 15)
   const [birthdayName, setBirthdayName] = React.useState("")
   const [wantsDecoration, setWantsDecoration] = React.useState(false)
   const [allergyText, setAllergyText] = React.useState("")
@@ -82,7 +82,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
   const selectedEvent = EVENT_TYPES.find((e) => e.label === eventType) || EVENT_TYPES[0]
 
   const handlePartySizeClick = (size: number) => {
-    if (size <= 8) {
+    if (size <= 15) {
       setPartySize(size)
       setShowMoreInput(false)
     }
@@ -90,6 +90,9 @@ export default function PersonasPage({ params }: PersonasPageProps) {
 
   const handleMoreClick = () => {
     setShowMoreInput(true)
+    if (partySize <= 15) {
+      setPartySize(16)
+    }
   }
 
   const addChip = (chip: string) => {
@@ -147,8 +150,8 @@ export default function PersonasPage({ params }: PersonasPageProps) {
 
       {/* Party Size Selector */}
       <div className="space-y-3">
-        <div className="grid grid-cols-4 sm:grid-cols-9 gap-2">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((size) => (
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((size) => (
             <button
               key={size}
               id={`party-size-${size}`}
@@ -171,7 +174,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
                 ? "border-[var(--primary)] bg-[var(--primary)] text-white"
                 : "border-neutral-800 bg-neutral-900/60 text-neutral-400 hover:border-neutral-600"
             }`}
-            aria-label="Más de 8 personas"
+            aria-label="Más de 15 personas"
           >
             + Más
           </button>
@@ -182,7 +185,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
             <span className="text-neutral-400 text-sm flex-1">Número de personas</span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setPartySize(Math.max(9, partySize - 1))}
+                onClick={() => setPartySize(Math.max(16, partySize - 1))}
                 className="w-8 h-8 rounded-lg border border-neutral-700 bg-neutral-800 flex items-center justify-center text-white hover:bg-neutral-700 transition-colors"
               >
                 <Minus className="w-3.5 h-3.5" />

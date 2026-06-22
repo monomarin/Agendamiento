@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server"
-import { Redis } from "@upstash/redis"
-import { Ratelimit } from "@upstash/ratelimit"
+import { redis, getRatelimit } from "@/lib/redis"
 import prisma from "@/lib/prisma"
 
-const redis = Redis.fromEnv()
-
 // Rate limit: 5 bookings per IP per hour
-const ratelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
-  prefix: "bookings-ratelimit",
-})
+const ratelimit = getRatelimit(5, "1 h", "bookings-ratelimit")
 
 // ──────────────────────────────────────────────────────────────────────────────
 // POST /api/bookings
@@ -19,7 +12,7 @@ const ratelimit = new Ratelimit({
 export async function POST(req: Request) {
   // 1. Rate limiting by IP
   const ip = req.headers.get("x-forwarded-for") || "127.0.0.1"
-  const { success: rateLimitOk } = await ratelimit.limit(ip)
+  const { success: rateLimitOk } = ratelimit ? await ratelimit.limit(ip) : { success: true }
   if (!rateLimitOk) {
     return NextResponse.json(
       { message: "Demasiados intentos. Espera un momento antes de intentar de nuevo." },
@@ -48,7 +41,7 @@ export async function POST(req: Request) {
   const lockKey = `slot-lock:${branchId}:${date}:${time}`
   const lockValue = `${ip}-${Date.now()}`
   // Try to SET NX EX 30 seconds
-  const lockAcquired = await redis.set(lockKey, lockValue, { nx: true, ex: 30 })
+  const lockAcquired = redis ? await redis.set(lockKey, lockValue, { nx: true, ex: 30 }) : true
   if (!lockAcquired) {
     return NextResponse.json(
       { message: "Este horario acaba de ser reservado. Por favor selecciona otro." },
@@ -77,7 +70,7 @@ export async function POST(req: Request) {
     })
 
     if (!branch) {
-      await redis.del(lockKey)
+      if (redis) await redis.del(lockKey)
       return NextResponse.json({ message: "Sede no encontrada" }, { status: 404 })
     }
 
@@ -199,7 +192,7 @@ export async function POST(req: Request) {
     // await redis.del(lockKey) — intentionally keep for 30s
 
     // 11. Invalidate availability cache for this slot
-    await redis.del(`availability:${branchId}:${date}:${partySize}`)
+    if (redis) await redis.del(`availability:${branchId}:${date}:${partySize}`)
 
     if (requiresPayment && paymentSettings) {
       // Return payment required flag — client will redirect to gateway
@@ -220,7 +213,7 @@ export async function POST(req: Request) {
     })
   } catch (error: any) {
     // Release lock on unexpected errors
-    await redis.del(lockKey)
+    if (redis) await redis.del(lockKey)
     console.error("[Bookings API Error]:", error)
     return NextResponse.json(
       { message: error.message || "Error interno del servidor." },

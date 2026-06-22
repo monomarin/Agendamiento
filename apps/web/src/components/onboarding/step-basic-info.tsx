@@ -39,6 +39,8 @@ const basicInfoSchema = z.object({
   }, "Teléfono inválido (debe incluir el código de país, ej: +57 300 123 4567)"),
   email: z.string().email("Correo electrónico inválido"),
   description: z.string().max(250, "La descripción no puede superar los 250 caracteres"),
+  logoUrl: z.string().url("URL del logo inválida").or(z.literal("")).optional(),
+  bannerUrl: z.string().url("URL de la imagen de fondo inválida").or(z.literal("")).optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Formato hex inválido"),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Formato hex inválido"),
   timezone: z.string(),
@@ -62,6 +64,8 @@ export function StepBasicInfo() {
       phone: restaurantInfo.phone,
       email: restaurantInfo.email || "",
       description: restaurantInfo.description || "",
+      logoUrl: restaurantInfo.logoUrl || "",
+      bannerUrl: restaurantInfo.bannerUrl || "",
       primaryColor: restaurantInfo.primaryColor,
       secondaryColor: restaurantInfo.secondaryColor,
       timezone: restaurantInfo.timezone,
@@ -442,6 +446,42 @@ export function StepBasicInfo() {
                       <Input placeholder="#171717" className="bg-neutral-900 border-neutral-800 text-white font-mono" {...field} />
                     </div>
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+            <FormField
+              control={form.control}
+              name="logoUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL del Logo (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://ejemplo.com/logo.png" className="bg-neutral-900 border-neutral-800 text-white" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-[10px] text-neutral-500">
+                    Imagen cuadrada del logo de tu marca.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="bannerUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL de Imagen de Fondo (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://ejemplo.com/banner.jpg" className="bg-neutral-900 border-neutral-800 text-white" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-[10px] text-neutral-500">
+                    Imagen del restaurante para el fondo desvanecido.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

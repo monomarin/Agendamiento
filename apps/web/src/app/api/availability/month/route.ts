@@ -75,10 +75,22 @@ export async function GET(req: Request) {
       }
 
       const booked = bookingsByDate[dateStr] || 0
-      const slots = Math.max(1, Math.floor(((parseInt(schedule.closeTime) - parseInt(schedule.openTime)) / 0.5) * tableCount))
-      const ratio = booked / (tableCount * 10) // approximate
+      
+      // Calculate realistic available slots
+      // openTime and closeTime stored as "HH:MM"
+      const [openH, openM] = (schedule.openTime || "12:00").split(":").map(Number)
+      const [closeH, closeM] = (schedule.closeTime || "23:00").split(":").map(Number)
+      const openMins = openH * 60 + openM
+      const closeMins = closeH * 60 + closeM - 90 // last slot 90 min before close
+      const slotCount = Math.max(1, Math.floor((closeMins - openMins) / 30))
+      
+      // Total "capacity events" per day = tables × slots
+      const totalCapacity = tableCount * slotCount
+      
+      // booked is the count of booking rows for this date
+      const ratio = totalCapacity > 0 ? booked / totalCapacity : 0
 
-      summary[dateStr] = ratio >= 1 ? "full" : ratio >= 0.7 ? "partial" : "available"
+      summary[dateStr] = ratio >= 0.9 ? "full" : ratio >= 0.5 ? "partial" : "available"
     }
 
     if (redis) await redis.setex(cacheKey, CACHE_TTL, summary)

@@ -80,6 +80,11 @@ export async function GET(req: Request) {
               const t = slot.time.slice(11, 16) // Extract HH:MM from ISO
               availabilityMap[t] = true
             }
+          } else {
+            // Cal.com returned error — fall back to all available
+            for (const slot of slots) {
+              availabilityMap[slot] = true
+            }
           }
         } catch (err) {
           console.error("[Cal.com availability error]:", err)
@@ -88,9 +93,14 @@ export async function GET(req: Request) {
             availabilityMap[slot] = true
           }
         }
+      } else {
+        // No calcomEventId configured — fall back to all available
+        for (const slot of slots) {
+          availabilityMap[slot] = true
+        }
       }
     } else {
-      // Dev/mock mode: all slots available
+      // Dev/mock mode or no table types: all slots available
       for (const slot of slots) {
         availabilityMap[slot] = true
       }

@@ -253,7 +253,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
   return (
     <div className="space-y-6">
       {/* 3-Column Grid for cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         
         {/* CARD 1: Comensales & Ocasión */}
         <div className="bg-neutral-900/40 border border-neutral-900 rounded-2xl p-5 backdrop-blur-xl space-y-5 relative overflow-hidden">
@@ -396,7 +396,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
         </div>
 
         {/* CARD 2: Calendario de Fecha */}
-        <div className="bg-neutral-900/40 border border-neutral-900 rounded-2xl p-5 backdrop-blur-xl space-y-4 relative overflow-hidden">
+        <div className="bg-neutral-900/40 border border-neutral-900 rounded-2xl p-5 backdrop-blur-xl space-y-4 relative overflow-hidden flex flex-col">
           <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--primary)]" />
           
           <div className="space-y-1">
@@ -475,7 +475,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
         </div>
 
         {/* CARD 3: Selector de Horarios */}
-        <div className="bg-neutral-900/40 border border-neutral-900 rounded-2xl p-5 backdrop-blur-xl space-y-4 relative overflow-hidden min-h-[350px]">
+        <div className="bg-neutral-900/40 border border-neutral-900 rounded-2xl p-5 backdrop-blur-xl space-y-4 relative overflow-hidden flex flex-col">
           <div className="absolute top-0 left-0 right-0 h-1 bg-[var(--primary)]" />
           
           <div className="space-y-1">

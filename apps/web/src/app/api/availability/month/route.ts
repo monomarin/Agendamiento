@@ -26,7 +26,10 @@ export async function GET(req: Request) {
     // Get schedules for the branch
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
-      include: { schedules: true },
+      include: {
+        restaurant: { select: { timezone: true } },
+        schedules: true,
+      },
     })
     if (!branch) return NextResponse.json({})
 
@@ -34,13 +37,19 @@ export async function GET(req: Request) {
     const summary: Record<string, "available" | "partial" | "full" | "closed"> = {}
     const daysInMonth = new Date(year, month, 0).getDate()
 
-    // Get all bookings for the month
-    const startDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0, 23, 59, 59)
+    const timezone = branch.restaurant?.timezone || "America/Bogota"
+
+    // Get all bookings for the month bounded by local month days converted to UTC
+    const startMonthStr = `${year}-${String(month).padStart(2, "0")}-01`
+    const startOfMonthUTC = parseLocalDateInTimezone(startMonthStr, "00:00", timezone)
+    
+    const endMonthStr = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`
+    const endOfMonthUTC = new Date(parseLocalDateInTimezone(endMonthStr, "00:00", timezone).getTime() + 24 * 60 * 60 * 1000 - 1000)
+
     const bookings = await prisma.booking.findMany({
       where: {
         branchId,
-        dateTime: { gte: startDate, lte: endDate },
+        dateTime: { gte: startOfMonthUTC, lte: endOfMonthUTC },
         status: { in: ["CONFIRMED", "CHECKED_IN", "PENDING_PAYMENT"] },
       },
       select: { dateTime: true },
@@ -59,13 +68,13 @@ export async function GET(req: Request) {
     // Count bookings by date
     const bookingsByDate: Record<string, number> = {}
     for (const b of bookings) {
-      const d = b.dateTime.toISOString().slice(0, 10)
+      const d = formatDateInTimezone(b.dateTime, timezone)
       bookingsByDate[d] = (bookingsByDate[d] || 0) + 1
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(year, month - 1, day)
-      const dateStr = d.toISOString().slice(0, 10)
+      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+      const d = new Date(dateStr + "T12:00:00")
       const dow = d.getDay()
       const schedule = branch.schedules.find((s: any) => s.dayOfWeek === dow)
 
@@ -99,4 +108,61 @@ export async function GET(req: Request) {
     console.error("[Month summary error]:", err)
     return NextResponse.json({})
   }
+}
+
+function parseLocalDateInTimezone(dateStr: string, timeStr: string, timeZone: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const [hour, minute] = timeStr.split(":").map(Number)
+  
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
+  
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  })
+  
+  const formattedParts = formatter.formatToParts(utcDate)
+  const parts: Record<string, number> = {}
+  for (const part of formattedParts) {
+    if (part.type !== "literal") {
+      parts[part.type] = Number(part.value)
+    }
+  }
+  
+  const targetLocalTime = Date.UTC(year, month - 1, day, hour, minute)
+  const actualLocalTime = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour === 24 ? 0 : parts.hour,
+    parts.minute
+  )
+  
+  const diff = targetLocalTime - actualLocalTime
+  return new Date(utcDate.getTime() + diff)
+}
+
+function formatDateInTimezone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  const parts = formatter.formatToParts(date)
+  let year = ""
+  let month = ""
+  let day = ""
+  for (const part of parts) {
+    if (part.type === "year") year = part.value
+    if (part.type === "month") month = part.value
+    if (part.type === "day") day = part.value
+  }
+  return `${year}-${month}-${day}`
 }

@@ -29,6 +29,7 @@ export async function GET(req: Request) {
     const branch = await prisma.branch.findUnique({
       where: { id: branchId },
       include: {
+        restaurant: { select: { timezone: true } },
         schedules: { where: { dayOfWeek } },
         tableTypes: {
           where: {
@@ -106,14 +107,18 @@ export async function GET(req: Request) {
       }
     }
 
+    const timezone = branch.restaurant?.timezone || "America/Bogota"
+    const startOfDayUTC = parseLocalDateInTimezone(date, "00:00", timezone)
+    const endOfDayUTC = new Date(startOfDayUTC.getTime() + 24 * 60 * 60 * 1000 - 1000)
+
     // ── Count existing bookings to detect "last table" state ──
     const bookingCounts = await prisma.booking.groupBy({
       by: ["dateTime"],
       where: {
         branchId,
         dateTime: {
-          gte: new Date(`${date}T00:00:00Z`),
-          lte: new Date(`${date}T23:59:59Z`),
+          gte: startOfDayUTC,
+          lte: endOfDayUTC,
         },
         status: { in: ["CONFIRMED", "CHECKED_IN", "PENDING_PAYMENT"] },
       },
@@ -123,7 +128,7 @@ export async function GET(req: Request) {
     const totalTables = branch.tableTypes.reduce((sum: number, t: any) => sum + t.quantity, 0)
     const bookedBySlot: Record<string, number> = {}
     for (const bc of bookingCounts) {
-      const t = bc.dateTime.toISOString().slice(11, 16)
+      const t = formatTimeInTimezone(bc.dateTime, timezone)
       bookedBySlot[t] = (bookedBySlot[t] || 0) + bc._count.id
     }
 
@@ -177,4 +182,62 @@ function generateTimeSlots(openTime: string, closeTime: string): string[] {
   }
 
   return slots
+}
+
+function parseLocalDateInTimezone(dateStr: string, timeStr: string, timeZone: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const [hour, minute] = timeStr.split(":").map(Number)
+  
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
+  
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  })
+  
+  const formattedParts = formatter.formatToParts(utcDate)
+  const parts: Record<string, number> = {}
+  for (const part of formattedParts) {
+    if (part.type !== "literal") {
+      parts[part.type] = Number(part.value)
+    }
+  }
+  
+  const targetLocalTime = Date.UTC(year, month - 1, day, hour, minute)
+  const actualLocalTime = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour === 24 ? 0 : parts.hour,
+    parts.minute
+  )
+  
+  const diff = targetLocalTime - actualLocalTime
+  return new Date(utcDate.getTime() + diff)
+}
+
+function formatTimeInTimezone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  })
+  
+  const parts = formatter.formatToParts(date)
+  let hour = ""
+  let minute = ""
+  for (const part of parts) {
+    if (part.type === "hour") hour = part.value;
+    if (part.type === "minute") minute = part.value;
+  }
+  
+  if (hour === "24") hour = "00";
+  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }

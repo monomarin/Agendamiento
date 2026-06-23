@@ -107,8 +107,8 @@ export async function POST(req: Request) {
     let calcomUid: string | null = null
     let confirmationCode: string
 
-    const tableType = branch.tableTypes[0]
-    const dateTime = new Date(`${date}T${time}:00`)
+    const timezone = branch.restaurant.timezone || "America/Bogota"
+    const dateTime = parseLocalDateInTimezone(date, time, timezone)
 
     if (calcomApiUrl && calcomApiKey && tableType?.calcomEventId) {
       try {
@@ -252,4 +252,42 @@ export async function GET(req: Request) {
     },
     restaurant: booking.branch.restaurant.name,
   })
+}
+
+function parseLocalDateInTimezone(dateStr: string, timeStr: string, timeZone: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  const [hour, minute] = timeStr.split(":").map(Number)
+  
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute))
+  
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hour12: false,
+  })
+  
+  const formattedParts = formatter.formatToParts(utcDate)
+  const parts: Record<string, number> = {}
+  for (const part of formattedParts) {
+    if (part.type !== "literal") {
+      parts[part.type] = Number(part.value)
+    }
+  }
+  
+  const targetLocalTime = Date.UTC(year, month - 1, day, hour, minute)
+  const actualLocalTime = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour === 24 ? 0 : parts.hour,
+    parts.minute
+  )
+  
+  const diff = targetLocalTime - actualLocalTime
+  return new Date(utcDate.getTime() + diff)
 }

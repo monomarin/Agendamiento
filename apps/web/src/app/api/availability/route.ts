@@ -32,7 +32,7 @@ export async function GET(req: Request) {
         schedules: { where: { dayOfWeek } },
         tableTypes: {
           where: {
-            minCapacity: { lte: partySize },
+            minCapacity: { lte: partySize === 1 ? 2 : partySize },
             maxCapacity: { gte: partySize },
           },
           select: { id: true, name: true, calcomEventId: true, quantity: true },

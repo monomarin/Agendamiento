@@ -75,6 +75,7 @@ model Restaurant {
   type            String            // e.g., "restaurante", "bar", "cafeteria"
   logoUrl         String?
   bannerUrl       String?
+  bannerOpacity   Float             @default(0.15)      // Background image opacity 0.0-1.0
   primaryColor    String            @default("#dc2626") // Default red-600
   secondaryColor  String            @default("#171717") // Default neutral-900
   status          RestaurantStatus  @default(DRAFT)
@@ -82,6 +83,7 @@ model Restaurant {
   city            String?
   email           String?
   plan            String            @default("FREE") // FREE | PRO | ENTERPRISE
+  creatorId       String?           // clerkUserId of the restaurant creator
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   

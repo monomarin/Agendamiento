@@ -128,3 +128,97 @@
     @apply font-sans;
   }
 }
+
+/* ── react-day-picker v9: force grid layout ─────────────────────────────── */
+/* The DayPicker v9 renders semantic table elements (month_grid = table).
+   Our flex classNames override only add Tailwind classes – we also need the
+   table/row/cell display model to be reset to flex here. */
+.rdp-root .rdp-month_grid {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+.rdp-root .rdp-weekdays {
+  display: table-row;
+}
+.rdp-root .rdp-weekday {
+  display: table-cell;
+  text-align: center;
+  width: 14.28571%; /* 1/7 */
+  padding-bottom: 0.5rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #737373;
+}
+.rdp-root .rdp-weeks {
+  display: table-row-group;
+}
+.rdp-root .rdp-week {
+  display: table-row;
+}
+.rdp-root .rdp-day {
+  display: table-cell;
+  width: 14.28571%;
+  vertical-align: middle;
+  text-align: center;
+  padding: 2px;
+}
+.rdp-root .rdp-day_button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.75rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  transition: all 150ms;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  color: #d4d4d4;
+}
+.rdp-root .rdp-day_button:hover {
+  background-color: #262626;
+}
+.rdp-root .rdp-day_button:disabled {
+  color: #404040;
+  cursor: not-allowed;
+}
+.rdp-root .rdp-selected .rdp-day_button {
+  background-color: var(--primary);
+  color: white;
+}
+.rdp-root .rdp-today .rdp-day_button {
+  color: var(--primary);
+  font-weight: 900;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+.rdp-root .rdp-outside {
+  opacity: 0;
+  pointer-events: none;
+}
+.rdp-root .rdp-disabled .rdp-day_button {
+  color: #404040;
+  cursor: not-allowed;
+}
+/* Availability dots — appended after day button content */
+.rdp-day_available .rdp-day_button::after,
+.rdp-day_partial .rdp-day_button::after,
+.rdp-day_full .rdp-day_button::after,
+.rdp-day_closed .rdp-day_button::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.rdp-day_available .rdp-day_button::after { background-color: #10b981; }
+.rdp-day_partial .rdp-day_button::after  { background-color: #fbbf24; }
+.rdp-day_full .rdp-day_button::after     { background-color: #ef4444; }
+.rdp-day_closed .rdp-day_button::after   { background-color: #404040; }

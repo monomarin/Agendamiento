@@ -41,6 +41,7 @@ const basicInfoSchema = z.object({
   description: z.string().max(250, "La descripción no puede superar los 250 caracteres"),
   logoUrl: z.string().url("URL del logo inválida").or(z.literal("")).optional(),
   bannerUrl: z.string().url("URL de la imagen de fondo inválida").or(z.literal("")).optional(),
+  bannerOpacity: z.number().min(0.05).max(1).optional(),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Formato hex inválido"),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Formato hex inválido"),
   timezone: z.string(),
@@ -66,6 +67,7 @@ export function StepBasicInfo() {
       description: restaurantInfo.description || "",
       logoUrl: restaurantInfo.logoUrl || "",
       bannerUrl: restaurantInfo.bannerUrl || "",
+      bannerOpacity: restaurantInfo.bannerOpacity ?? 0.15,
       primaryColor: restaurantInfo.primaryColor,
       secondaryColor: restaurantInfo.secondaryColor,
       timezone: restaurantInfo.timezone,
@@ -191,7 +193,10 @@ export function StepBasicInfo() {
   }
 
   const onSubmit = (values: BasicInfoValues) => {
-    updateRestaurantInfo(values)
+    updateRestaurantInfo({
+      ...values,
+      bannerOpacity: values.bannerOpacity ?? 0.15,
+    })
     nextStep()
   }
 
@@ -452,39 +457,124 @@ export function StepBasicInfo() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+          {/* Logo URL + live preview */}
+          <div className="pt-2">
             <FormField
               control={form.control}
               name="logoUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL del Logo (Opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://ejemplo.com/logo.png" className="bg-neutral-900 border-neutral-800 text-white" {...field} />
-                  </FormControl>
-                  <FormDescription className="text-[10px] text-neutral-500">
-                    Imagen cuadrada del logo de tu marca.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const isValidUrl = (() => { try { new URL(field.value || ""); return true } catch { return false } })()
+                return (
+                  <FormItem>
+                    <FormLabel>URL del Logo (Opcional)</FormLabel>
+                    <div className="flex gap-3 items-start">
+                      {/* Preview box */}
+                      <div className="flex-shrink-0 w-14 h-14 rounded-xl border border-neutral-800 bg-neutral-950 overflow-hidden flex items-center justify-center">
+                        {isValidUrl && field.value ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={field.value}
+                            alt="Logo preview"
+                            className="w-full h-full object-contain"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <span className="text-neutral-700 text-[10px] text-center leading-tight px-1">Sin imagen</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <FormControl>
+                          <Input
+                            placeholder="https://ejemplo.com/logo.png"
+                            className="bg-neutral-900 border-neutral-800 text-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-[10px] text-neutral-500 mt-1">
+                          Imagen cuadrada o circular del logo de tu marca.
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </div>
+                  </FormItem>
+                )
+              }}
             />
+          </div>
 
+          {/* Banner URL + opacity slider + live preview */}
+          <div className="pt-2">
             <FormField
               control={form.control}
               name="bannerUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>URL de Imagen de Fondo (Opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://ejemplo.com/banner.jpg" className="bg-neutral-900 border-neutral-800 text-white" {...field} />
-                  </FormControl>
-                  <FormDescription className="text-[10px] text-neutral-500">
-                    Imagen del restaurante para el fondo desvanecido.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field: bannerField }) => {
+                const opacityValue = form.watch("bannerOpacity") ?? 0.15
+                const isValidBannerUrl = (() => { try { new URL(bannerField.value || ""); return true } catch { return false } })()
+                return (
+                  <FormItem>
+                    <FormLabel>URL de Imagen de Fondo (Opcional)</FormLabel>
+
+                    {/* Banner live preview */}
+                    {isValidBannerUrl && bannerField.value && (
+                      <div className="relative w-full h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 mb-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={bannerField.value}
+                          alt="Vista previa del fondo"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ opacity: opacityValue }}
+                        />
+                        <div className="relative z-10 flex items-center justify-center h-full">
+                          <span className="text-[10px] text-neutral-400 bg-black/40 px-2 py-1 rounded">
+                            Vista previa · opacidad {Math.round(opacityValue * 100)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <FormControl>
+                      <Input
+                        placeholder="https://ejemplo.com/fondo.jpg"
+                        className="bg-neutral-900 border-neutral-800 text-white"
+                        {...bannerField}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-[10px] text-neutral-500 mt-1">
+                      Imagen de tu restaurante para el fondo decorativo del portal de reservas.
+                    </FormDescription>
+                    <FormMessage />
+
+                    {/* Opacity slider */}
+                    <div className="mt-3 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs text-neutral-400">Opacidad del fondo</label>
+                        <span className="text-xs font-mono font-bold text-white bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded">
+                          {Math.round(opacityValue * 100)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-neutral-600">5%</span>
+                        <input
+                          type="range"
+                          min={0.05}
+                          max={1}
+                          step={0.05}
+                          value={opacityValue}
+                          onChange={(e) => form.setValue("bannerOpacity", parseFloat(e.target.value))}
+                          className="flex-1 h-1.5 rounded-full accent-red-500 cursor-pointer"
+                          style={{
+                            background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${(opacityValue - 0.05) / 0.95 * 100}%, #262626 ${(opacityValue - 0.05) / 0.95 * 100}%, #262626 100%)`
+                          }}
+                        />
+                        <span className="text-[10px] text-neutral-600">100%</span>
+                      </div>
+                      <p className="text-[10px] text-neutral-600">
+                        Ajusta para que se vea bien con fotos claras u oscuras.
+                      </p>
+                    </div>
+                  </FormItem>
+                )
+              }}
             />
           </div>
         </div>

@@ -170,9 +170,9 @@ export default function PagoPage({ params }: PagoPageProps) {
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">Detalles de Reserva</h3>
             <button
-              onClick={() => router.push(`/${slug}/reservar/fecha`)}
+              onClick={() => router.push(`/${slug}/reservar/personas`)}
               className="text-neutral-500 hover:text-neutral-300 transition-colors"
-              aria-label="Editar fecha y hora"
+              aria-label="Editar detalles de reserva"
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>

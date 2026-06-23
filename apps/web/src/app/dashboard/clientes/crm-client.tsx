@@ -576,11 +576,23 @@ export default function CrmClient({ restaurantId }: CrmClientProps) {
                       {/* Save Profile Button */}
                       <button
                         onClick={handleUpdateProfile}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg shadow-red-600/10 transition-all pt-2"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-neutral-850 hover:bg-neutral-800 text-white text-xs font-bold transition-all"
                       >
                         <Save className="w-4 h-4" />
                         Guardar Ficha
                       </button>
+
+                      {/* Danger Zone */}
+                      <div className="border-t border-red-900/20 mt-4 pt-4 space-y-2">
+                        <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">Zona de Peligro</p>
+                        <button
+                          onClick={handleDeleteCustomer}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-950/20 border border-red-900/30 hover:bg-red-900/40 text-red-400 text-xs font-bold transition-all"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Eliminar Cliente
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

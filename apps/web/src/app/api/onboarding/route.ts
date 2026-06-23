@@ -99,10 +99,12 @@ export async function POST(req: Request) {
           description: restaurantInfo.description || null,
           logoUrl: restaurantInfo.logoUrl || null,
           bannerUrl: restaurantInfo.bannerUrl || null,
+          bannerOpacity: restaurantInfo.bannerOpacity ?? 0.15,
           primaryColor: restaurantInfo.primaryColor,
           secondaryColor: restaurantInfo.secondaryColor,
           timezone: restaurantInfo.timezone || "America/Bogota",
           status: "ACTIVE", // Onboarding completes, restaurant is active
+          creatorId: clerkUserId,
         },
       })
 

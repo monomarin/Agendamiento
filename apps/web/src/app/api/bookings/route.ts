@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         },
         tableTypes: {
           where: {
-            minCapacity: { lte: partySize },
+            minCapacity: { lte: partySize === 1 ? 2 : partySize },
             maxCapacity: { gte: partySize },
           },
           take: 1,
@@ -145,14 +145,14 @@ export async function POST(req: Request) {
           confirmationCode = (calcomUid || "").slice(0, 8).toUpperCase()
         } else {
           // Cal.com failed → release lock and return error
-          await redis.del(lockKey)
+          if (redis) await redis.del(lockKey)
           return NextResponse.json(
             { message: "No se pudo crear la reserva en el sistema de calendarios. Intenta de nuevo." },
             { status: 502 }
           )
         }
       } catch (err) {
-        await redis.del(lockKey)
+        if (redis) await redis.del(lockKey)
         return NextResponse.json(
           { message: "Error de conexión con el sistema de reservas." },
           { status: 502 }

@@ -13,6 +13,7 @@ export interface OnboardingRestaurantInfo {
   city: string
   logoUrl?: string
   bannerUrl?: string
+  bannerOpacity: number
   primaryColor: string
   secondaryColor: string
   timezone: string
@@ -97,6 +98,7 @@ const initialRestaurantInfo: OnboardingRestaurantInfo = {
   city: "",
   primaryColor: "#dc2626", // Red-600
   secondaryColor: "#171717", // Neutral-900
+  bannerOpacity: 0.15,
   timezone: "America/Bogota",
 }
 

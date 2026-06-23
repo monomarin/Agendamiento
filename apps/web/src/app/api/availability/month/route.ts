@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     const totalTables = await prisma.tableType.aggregate({
       where: {
         branchId,
-        minCapacity: { lte: partySize },
+        minCapacity: { lte: partySize === 1 ? 2 : partySize },
         maxCapacity: { gte: partySize },
       },
       _sum: { quantity: true },

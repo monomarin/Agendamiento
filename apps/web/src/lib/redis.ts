@@ -1,15 +1,46 @@
 import { Redis } from "@upstash/redis"
 import { Ratelimit } from "@upstash/ratelimit"
 
+const url = process.env.UPSTASH_REDIS_REST_URL
+const token = process.env.UPSTASH_REDIS_REST_TOKEN
+
 const hasRedis = !!(
-  process.env.UPSTASH_REDIS_REST_URL && 
-  process.env.UPSTASH_REDIS_REST_TOKEN
+  url && 
+  token && 
+  url !== "placeholder_redis_url" &&
+  token !== "placeholder_redis_token" &&
+  !url.includes("placeholder") &&
+  !token.includes("placeholder")
 )
 
-export const redis = hasRedis
+const rawRedis = hasRedis
   ? new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      url: url!,
+      token: token!,
+    })
+  : null
+
+export const redis = rawRedis
+  ? new Proxy(rawRedis, {
+      get(target, prop, receiver) {
+        const val = Reflect.get(target, prop, receiver)
+        if (typeof val === "function" && prop !== "then") {
+          return async (...args: any[]) => {
+            try {
+              return await val.apply(target, args)
+            } catch (err) {
+              console.error(`[Redis Client Error on "${String(prop)}"]:`, err)
+              // Return safe defaults on error
+              if (prop === "set" && args[2]?.nx) {
+                // If it's a lock acquisition with NX, return "OK" (truthy) to bypass lock rather than block the user
+                return "OK"
+              }
+              return null
+            }
+          }
+        }
+        return val
+      }
     })
   : null
 

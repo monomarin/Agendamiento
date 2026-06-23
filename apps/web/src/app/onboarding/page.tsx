@@ -21,13 +21,27 @@ const STEPS = [
 
 export default function OnboardingPage() {
   const { user } = useUser()
-  const { currentStep } = useOnboardingStore()
+  const { currentStep, reset } = useOnboardingStore()
 
   // Prevent hydration mismatches
   const [mounted, setMounted] = React.useState(false)
+
   React.useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Detect ?new=true to reset onboarding state for creating a new restaurant
+  React.useEffect(() => {
+    if (mounted) {
+      const searchParams = new URLSearchParams(window.location.search)
+      if (searchParams.get("new") === "true") {
+        reset()
+        // Clean URL parameter
+        const cleanUrl = window.location.pathname
+        window.history.replaceState({}, "", cleanUrl)
+      }
+    }
+  }, [mounted, reset])
 
   // Auto-Save Effect: Runs every 30 seconds when mounted
   React.useEffect(() => {

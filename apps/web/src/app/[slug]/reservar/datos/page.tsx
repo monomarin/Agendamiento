@@ -85,8 +85,8 @@ export default function DatosPage({ params }: DatosPageProps) {
   }
 
   const handleBack = () => {
-    setStep(2)
-    router.push(`/${slug}/reservar/fecha`)
+    setStep(1)
+    router.push(`/${slug}/reservar/personas`)
   }
 
   return (

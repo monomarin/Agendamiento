@@ -22,6 +22,12 @@ export default async function ConfiguracionPage() {
         select: {
           name: true,
           slug: true,
+          description: true,
+          logoUrl: true,
+          bannerUrl: true,
+          bannerOpacity: true,
+          primaryColor: true,
+          secondaryColor: true,
         },
       },
     },
@@ -144,6 +150,12 @@ export default async function ConfiguracionPage() {
       restaurantName={restaurantName}
       restaurantSlug={restaurantSlug}
       ownerEmail={ownerEmail}
+      restaurantLogoUrl={user.restaurant.logoUrl}
+      restaurantBannerUrl={user.restaurant.bannerUrl}
+      restaurantBannerOpacity={user.restaurant.bannerOpacity}
+      restaurantPrimaryColor={user.restaurant.primaryColor}
+      restaurantSecondaryColor={user.restaurant.secondaryColor}
+      restaurantDescription={user.restaurant.description}
     />
   )
 }

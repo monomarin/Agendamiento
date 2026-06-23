@@ -10,15 +10,17 @@ import { Label } from "@/components/ui/label"
 
 export function StepTableTypes() {
   const { tableTypes, updateTableTypes, nextStep, prevStep } = useOnboardingStore()
-
-  // Local state initialized from Zustand
-  const [localTypes, setLocalTypes] = React.useState<OnboardingTableType[]>(tableTypes)
+  const [mounted, setMounted] = React.useState(false)
 
   // Form input states for new table type
   const [newName, setNewName] = React.useState("")
   const [newMin, setNewMin] = React.useState(2)
   const [newMax, setNewMax] = React.useState(4)
   const [newQty, setNewQty] = React.useState(5)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleAddTableType = () => {
     if (!newName.trim()) return
@@ -31,7 +33,7 @@ export function StepTableTypes() {
       quantity: Number(newQty),
     }
 
-    setLocalTypes([...localTypes, newType])
+    updateTableTypes([...tableTypes, newType])
     setNewName("")
     setNewMin(2)
     setNewMax(4)
@@ -41,17 +43,18 @@ export function StepTableTypes() {
   const handleRemoveTableType = (idToRemove?: string, indexToRemove?: number) => {
     let updated: OnboardingTableType[] = []
     if (idToRemove) {
-      updated = localTypes.filter((t) => t.id !== idToRemove)
+      updated = tableTypes.filter((t) => t.id !== idToRemove)
     } else if (indexToRemove !== undefined) {
-      updated = localTypes.filter((_, idx) => idx !== indexToRemove)
+      updated = tableTypes.filter((_, idx) => idx !== indexToRemove)
     }
-    setLocalTypes(updated)
+    updateTableTypes(updated)
   }
 
   const handleNext = () => {
-    updateTableTypes(localTypes)
     nextStep()
   }
+
+  if (!mounted) return null
 
   return (
     <div className="space-y-6">
@@ -133,16 +136,16 @@ export function StepTableTypes() {
           {/* List of configured tables */}
           <div className="space-y-3">
             <h4 className="font-semibold text-neutral-300 text-xs uppercase tracking-wider">
-              Categorías Configuradas ({localTypes.length})
+              Categorías Configuradas ({tableTypes.length})
             </h4>
 
-            {localTypes.length === 0 ? (
+            {tableTypes.length === 0 ? (
               <div className="p-8 text-center border border-dashed border-neutral-800 rounded-xl text-neutral-500 text-sm">
                 Aún no has agregado tipos de mesa. Agrega al menos uno para continuar.
               </div>
             ) : (
               <div className="space-y-2">
-                {localTypes.map((type, index) => (
+                {tableTypes.map((type, index) => (
                   <div
                     key={type.id || index}
                     className="flex justify-between items-center p-3 rounded-lg bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 transition-colors"
@@ -176,13 +179,13 @@ export function StepTableTypes() {
             <h3 className="font-semibold text-white text-sm">Visualizador de Distribución</h3>
           </div>
 
-          <div className="flex-1 min-h-[220px] rounded-lg border border-neutral-800 bg-neutral-950 p-4 flex flex-wrap gap-4 items-center justify-center overflow-y-auto">
-            {localTypes.length === 0 ? (
-              <span className="text-neutral-600 text-xs text-center">
+          <div className="h-[350px] overflow-y-auto w-full rounded-lg border border-neutral-800 bg-neutral-950 p-4 flex flex-wrap gap-4 items-start justify-center">
+            {tableTypes.length === 0 ? (
+              <span className="text-neutral-600 text-xs text-center self-center">
                 Configura mesas para ver el diseño interactivo aquí.
               </span>
             ) : (
-              localTypes.flatMap((type, typeIdx) =>
+              tableTypes.flatMap((type, typeIdx) =>
                 Array.from({ length: type.quantity }).map((_, seatIdx) => {
                   const isCircle = typeIdx % 2 === 0
                   return (
@@ -226,7 +229,7 @@ export function StepTableTypes() {
         <Button
           type="button"
           className="bg-red-600 hover:bg-red-700 text-white px-6"
-          disabled={localTypes.length === 0}
+          disabled={tableTypes.length === 0}
           onClick={handleNext}
         >
           Siguiente Paso

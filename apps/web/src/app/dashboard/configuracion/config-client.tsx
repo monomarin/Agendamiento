@@ -4,7 +4,7 @@ import * as React from "react"
 import {
   Key, Webhook, ToyBrick, Plus, Trash2, Clipboard, ClipboardCheck,
   RefreshCw, Check, AlertTriangle, Eye, ArrowRight, ShieldAlert,
-  Calendar, CheckCircle, HelpCircle, Save, ExternalLink, Building2, Edit2, X
+  Calendar, CheckCircle, HelpCircle, Save, ExternalLink, Building2, Edit2, X, Palette
 } from "lucide-react"
 
 interface TableProp {
@@ -65,6 +65,12 @@ interface ConfigClientProps {
   restaurantName: string
   restaurantSlug: string
   ownerEmail: string
+  restaurantLogoUrl?: string | null
+  restaurantBannerUrl?: string | null
+  restaurantBannerOpacity?: number
+  restaurantPrimaryColor?: string
+  restaurantSecondaryColor?: string
+  restaurantDescription?: string | null
 }
 
 export default function ConfigClient({
@@ -77,8 +83,26 @@ export default function ConfigClient({
   restaurantName,
   restaurantSlug,
   ownerEmail,
+  restaurantLogoUrl = "",
+  restaurantBannerUrl = "",
+  restaurantBannerOpacity = 0.15,
+  restaurantPrimaryColor = "#dc2626",
+  restaurantSecondaryColor = "#171717",
+  restaurantDescription = "",
 }: ConfigClientProps) {
-  const [activeTab, setActiveTab] = React.useState<"sedes" | "keys" | "webhooks" | "integrations">("sedes")
+  const [activeTab, setActiveTab] = React.useState<"sedes" | "keys" | "webhooks" | "integrations" | "apariencia">("sedes")
+
+  // Branding Settings State
+  const [logoUrl, setLogoUrl] = React.useState(restaurantLogoUrl || "")
+  const [bannerUrl, setBannerUrl] = React.useState(restaurantBannerUrl || "")
+  const [bannerOpacity, setBannerOpacity] = React.useState(restaurantBannerOpacity ?? 0.15)
+  const [primaryColor, setPrimaryColor] = React.useState(restaurantPrimaryColor ?? "#dc2626")
+  const [secondaryColor, setSecondaryColor] = React.useState(restaurantSecondaryColor ?? "#171717")
+  const [description, setDescription] = React.useState(restaurantDescription || "")
+  const [restaurantNameState, setRestaurantNameState] = React.useState(restaurantName || "")
+
+  const [isSavingBrand, setIsSavingBrand] = React.useState(false)
+  const [brandMessage, setBrandMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
   // API Keys State
   const [apiKeys, setApiKeys] = React.useState<ApiKeyProp[]>(initialApiKeys)
@@ -206,6 +230,41 @@ export default function ConfigClient({
         alert(json.message || "Error al eliminar")
       }
     } catch { alert("Error de red") }
+  }
+
+  const handleUpdateBrand = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!restaurantNameState.trim()) {
+      setBrandMessage({ type: "error", text: "El nombre del restaurante es obligatorio." })
+      return
+    }
+    setIsSavingBrand(true)
+    setBrandMessage(null)
+    try {
+      const res = await fetch("/api/dashboard/restaurants", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: restaurantNameState,
+          description,
+          logoUrl,
+          bannerUrl,
+          bannerOpacity,
+          primaryColor,
+          secondaryColor,
+        }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setBrandMessage({ type: "success", text: "Configuración guardada exitosamente." })
+      } else {
+        setBrandMessage({ type: "error", text: json.message || "Error al actualizar la configuración." })
+      }
+    } catch {
+      setBrandMessage({ type: "error", text: "Error de red al actualizar la configuración." })
+    } finally {
+      setIsSavingBrand(false)
+    }
   }
 
   // --- Handlers para API Keys ---
@@ -534,6 +593,15 @@ export default function ConfigClient({
           >
             <ToyBrick className="w-4 h-4" />
             Integraciones
+          </button>
+          <button
+            onClick={() => setActiveTab("apariencia")}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === "apariencia" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
+            }`}
+          >
+            <Palette className="w-4 h-4" />
+            Personalización
           </button>
         </div>
       </div>
@@ -1466,6 +1534,230 @@ export default function ConfigClient({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* --- TAB 5: APARIENCIA (PERSONALIZACIÓN) --- */}
+      {activeTab === "apariencia" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Palette className="w-5 h-5 text-red-500" />
+              Personalización de la Marca
+            </h2>
+          </div>
+
+          <form onSubmit={handleUpdateBrand} className="space-y-6 max-w-2xl bg-neutral-900/40 border border-neutral-800 rounded-2xl p-6">
+            {brandMessage && (
+              <div className={`p-4 rounded-xl text-sm border ${
+                brandMessage.type === "success" 
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                  : "bg-red-500/10 border-red-500/20 text-red-400"
+              }`}>
+                {brandMessage.text}
+              </div>
+            )}
+
+            {/* Restaurant Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-white block">Nombre del Establecimiento</label>
+              <input
+                type="text"
+                value={restaurantNameState}
+                onChange={(e) => setRestaurantNameState(e.target.value)}
+                placeholder="Nombre del restaurante"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                required
+              />
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-white block">Descripción (Opcional)</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Una breve descripción para tu establecimiento (máx. 250 caracteres)"
+                maxLength={250}
+                rows={3}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors resize-none"
+              />
+              <span className="text-[10px] text-neutral-500 block text-right">
+                {description.length}/250 caracteres
+              </span>
+            </div>
+
+            {/* Colors Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Primary Color */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white block">Color Primario (Marca)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-12 h-10 p-1 bg-transparent border border-neutral-800 rounded-xl cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    placeholder="#dc2626"
+                    className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm font-mono focus:outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Secondary Color */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-white block">Color Secundario</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-12 h-10 p-1 bg-transparent border border-neutral-800 rounded-xl cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    placeholder="#171717"
+                    className="flex-1 bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm font-mono focus:outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Logo URL */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-white block">URL del Logo (Opcional)</label>
+              <div className="flex gap-3 items-start">
+                <div className="flex-shrink-0 w-14 h-14 rounded-xl border border-neutral-800 bg-neutral-950 overflow-hidden flex items-center justify-center">
+                  {(() => {
+                    try {
+                      new URL(logoUrl);
+                      return (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={logoUrl}
+                          alt="Logo preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                        />
+                      )
+                    } catch {
+                      return <span className="text-neutral-700 text-[10px] text-center leading-tight px-1">Sin imagen</span>
+                    }
+                  })()}
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://ejemplo.com/logo.png"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Imagen cuadrada o circular del logo de tu marca.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Banner URL */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-white block">URL de Imagen de Fondo (Opcional)</label>
+              
+              {(() => {
+                try {
+                  new URL(bannerUrl);
+                  return (
+                    <div className="relative w-full h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 mb-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={bannerUrl}
+                        alt="Vista previa del fondo"
+                        className="absolute inset-0 w-full h-full object-cover"
+                        style={{ opacity: bannerOpacity }}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                      <div className="relative z-10 flex items-center justify-center h-full">
+                        <span className="text-[10px] text-neutral-400 bg-black/40 px-2 py-1 rounded">
+                          Vista previa · opacidad {Math.round(bannerOpacity * 100)}%
+                        </span>
+                      </div>
+                    </div>
+                  )
+                } catch {
+                  return null
+                }
+              })()}
+
+              <input
+                type="text"
+                value={bannerUrl}
+                onChange={(e) => setBannerUrl(e.target.value)}
+                placeholder="https://ejemplo.com/fondo.jpg"
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+              />
+              <p className="text-[10px] text-neutral-500 mt-1">
+                Imagen de tu restaurante para el fondo decorativo del portal de reservas.
+              </p>
+
+              {/* Opacity slider */}
+              <div className="mt-3 space-y-1.5 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-neutral-400">Opacidad del fondo</label>
+                  <span className="text-xs font-mono font-bold text-white bg-neutral-900 border border-neutral-800 px-2 py-0.5 rounded">
+                    {Math.round(bannerOpacity * 100)}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-neutral-600">5%</span>
+                  <input
+                    type="range"
+                    min={0.05}
+                    max={1}
+                    step={0.05}
+                    value={bannerOpacity}
+                    onChange={(e) => setBannerOpacity(parseFloat(e.target.value))}
+                    className="flex-1 h-1.5 rounded-full accent-red-500 cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${(bannerOpacity - 0.05) / 0.95 * 100}%, #262626 ${(bannerOpacity - 0.05) / 0.95 * 100}%, #262626 100%)`
+                    }}
+                  />
+                  <span className="text-[10px] text-neutral-600">100%</span>
+                </div>
+                <p className="text-[10px] text-neutral-600">
+                  Ajusta para que se vea bien con fotos claras u oscuras.
+                </p>
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={isSavingBrand}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-neutral-800 text-white text-sm font-semibold transition-all shadow-lg shadow-red-600/15"
+              >
+                {isSavingBrand ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Guardar Cambios
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

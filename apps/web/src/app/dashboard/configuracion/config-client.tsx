@@ -563,10 +563,10 @@ export default function ConfigClient({
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Configuración del Sistema</h1>
           <p className="text-neutral-400 text-sm mt-1">Gestiona claves API, webhooks de integración y mapeo del POS.</p>
         </div>
-        <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-xl p-1">
+        <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 rounded-xl p-1 overflow-x-auto max-w-full scrollbar-none whitespace-nowrap">
           <button
             onClick={() => setActiveTab("sedes")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex-shrink-0 ${
               activeTab === "sedes" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
             }`}
           >
@@ -575,7 +575,7 @@ export default function ConfigClient({
           </button>
           <button
             onClick={() => setActiveTab("keys")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex-shrink-0 ${
               activeTab === "keys" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
             }`}
           >
@@ -584,7 +584,7 @@ export default function ConfigClient({
           </button>
           <button
             onClick={() => setActiveTab("webhooks")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex-shrink-0 ${
               activeTab === "webhooks" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
             }`}
           >
@@ -593,7 +593,7 @@ export default function ConfigClient({
           </button>
           <button
             onClick={() => setActiveTab("integrations")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex-shrink-0 ${
               activeTab === "integrations" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
             }`}
           >
@@ -602,7 +602,7 @@ export default function ConfigClient({
           </button>
           <button
             onClick={() => setActiveTab("apariencia")}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex-shrink-0 ${
               activeTab === "apariencia" ? "bg-red-600 text-white shadow-lg shadow-red-600/15" : "text-neutral-400 hover:text-white"
             }`}
           >

@@ -28,6 +28,7 @@ export default async function ConfiguracionPage() {
           bannerOpacity: true,
           primaryColor: true,
           secondaryColor: true,
+          timezone: true,
         },
       },
     },
@@ -156,6 +157,7 @@ export default async function ConfiguracionPage() {
       restaurantPrimaryColor={user.restaurant.primaryColor}
       restaurantSecondaryColor={user.restaurant.secondaryColor}
       restaurantDescription={user.restaurant.description}
+      restaurantTimezone={user.restaurant.timezone}
     />
   )
 }

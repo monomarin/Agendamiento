@@ -125,7 +125,10 @@ export async function GET(req: Request) {
       _count: { id: true },
     })
 
+    // If no matching table types found, treat as unlimited capacity (all slots available)
     const totalTables = branch.tableTypes.reduce((sum: number, t: any) => sum + t.quantity, 0)
+    const hasTableConstraint = totalTables > 0
+
     const bookedBySlot: Record<string, number> = {}
     for (const bc of bookingCounts) {
       const t = formatTimeInTimezone(bc.dateTime, timezone)
@@ -135,11 +138,12 @@ export async function GET(req: Request) {
     const slotData = slots.map((time) => {
       const booked = bookedBySlot[time] || 0
       const available = availabilityMap[time] !== false
-      const remaining = totalTables - booked
+      // If no table types configured, only block by Cal.com availability (availabilityMap)
+      const remaining = hasTableConstraint ? totalTables - booked : Infinity
       return {
         time,
         available: available && remaining > 0,
-        isLastTable: available && remaining === 1,
+        isLastTable: hasTableConstraint && available && remaining === 1,
       }
     })
 

@@ -28,6 +28,7 @@ export async function PUT(req: Request) {
       bannerOpacity,
       primaryColor,
       secondaryColor,
+      timezone,
     } = body
 
     if (!name || !name.trim()) {
@@ -44,6 +45,7 @@ export async function PUT(req: Request) {
         bannerOpacity: typeof bannerOpacity === "number" ? bannerOpacity : 0.15,
         primaryColor: primaryColor || "#dc2626",
         secondaryColor: secondaryColor || "#171717",
+        timezone: timezone || "America/Bogota",
       },
     })
 

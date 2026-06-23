@@ -71,6 +71,7 @@ interface ConfigClientProps {
   restaurantPrimaryColor?: string
   restaurantSecondaryColor?: string
   restaurantDescription?: string | null
+  restaurantTimezone?: string | null
 }
 
 export default function ConfigClient({
@@ -89,6 +90,7 @@ export default function ConfigClient({
   restaurantPrimaryColor = "#dc2626",
   restaurantSecondaryColor = "#171717",
   restaurantDescription = "",
+  restaurantTimezone = "America/Bogota",
 }: ConfigClientProps) {
   const [activeTab, setActiveTab] = React.useState<"sedes" | "keys" | "webhooks" | "integrations" | "apariencia">("sedes")
 
@@ -100,9 +102,12 @@ export default function ConfigClient({
   const [secondaryColor, setSecondaryColor] = React.useState(restaurantSecondaryColor ?? "#171717")
   const [description, setDescription] = React.useState(restaurantDescription || "")
   const [restaurantNameState, setRestaurantNameState] = React.useState(restaurantName || "")
+  const [timezone, setTimezone] = React.useState(restaurantTimezone || "America/Bogota")
 
   const [isSavingBrand, setIsSavingBrand] = React.useState(false)
   const [brandMessage, setBrandMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [logoError, setLogoError] = React.useState(false)
+  const [bannerError, setBannerError] = React.useState(false)
 
   // API Keys State
   const [apiKeys, setApiKeys] = React.useState<ApiKeyProp[]>(initialApiKeys)
@@ -252,6 +257,7 @@ export default function ConfigClient({
           bannerOpacity,
           primaryColor,
           secondaryColor,
+          timezone,
         }),
       })
       const json = await res.json()
@@ -1587,6 +1593,38 @@ export default function ConfigClient({
               </span>
             </div>
 
+            {/* Timezone Selector */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-white block">Zona Horaria</label>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
+              >
+                <option value="America/Bogota">Colombia / Ecuador / Perú (America/Bogota - GMT-5)</option>
+                <option value="America/Mexico_City">México (America/Mexico_City - GMT-6)</option>
+                <option value="America/Caracas">Venezuela (America/Caracas - GMT-4)</option>
+                <option value="America/Santiago">Chile (America/Santiago - GMT-4/GMT-3)</option>
+                <option value="America/Buenos_Aires">Argentina (America/Buenos_Aires - GMT-3)</option>
+                <option value="America/Guayaquil">Ecuador (America/Guayaquil - GMT-5)</option>
+                <option value="America/Lima">Perú (America/Lima - GMT-5)</option>
+                <option value="America/Panama">Panamá (America/Panama - GMT-5)</option>
+                <option value="America/Costa_Rica">Costa Rica (America/Costa_Rica - GMT-6)</option>
+                <option value="America/Asuncion">Paraguay (America/Asuncion - GMT-4)</option>
+                <option value="America/Montevideo">Uruguay (America/Montevideo - GMT-3)</option>
+                <option value="America/La_Paz">Bolivia (America/La_Paz - GMT-4)</option>
+                <option value="America/New_York">EE.UU. Este (America/New_York - GMT-5)</option>
+                <option value="America/Chicago">EE.UU. Centro (America/Chicago - GMT-6)</option>
+                <option value="America/Denver">EE.UU. Montaña (America/Denver - GMT-7)</option>
+                <option value="America/Los_Angeles">EE.UU. Pacífico (America/Los_Angeles - GMT-8)</option>
+                <option value="Europe/Madrid">España (Europe/Madrid - GMT+1/GMT+2)</option>
+                <option value="UTC">UTC (Coordinated Universal Time)</option>
+              </select>
+              <p className="text-[10px] text-neutral-500">
+                Determina cómo se calculan las fechas y horas locales para las reservas de tus clientes.
+              </p>
+            </div>
+
             {/* Colors Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Primary Color */}
@@ -1635,28 +1673,27 @@ export default function ConfigClient({
               <label className="text-sm font-semibold text-white block">URL del Logo (Opcional)</label>
               <div className="flex gap-3 items-start">
                 <div className="flex-shrink-0 w-14 h-14 rounded-xl border border-neutral-800 bg-neutral-950 overflow-hidden flex items-center justify-center">
-                  {(() => {
-                    try {
-                      new URL(logoUrl);
-                      return (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={logoUrl}
-                          alt="Logo preview"
-                          className="w-full h-full object-contain"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        />
-                      )
-                    } catch {
-                      return <span className="text-neutral-700 text-[10px] text-center leading-tight px-1">Sin imagen</span>
-                    }
-                  })()}
+                  {logoUrl.trim() && !logoError ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={logoUrl}
+                      src={logoUrl}
+                      alt="Logo preview"
+                      className="w-full h-full object-contain"
+                      onError={() => setLogoError(true)}
+                    />
+                  ) : (
+                    <span className="text-neutral-700 text-[10px] text-center leading-tight px-1">Sin imagen</span>
+                  )}
                 </div>
                 <div className="flex-1">
                   <input
                     type="text"
                     value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
+                    onChange={(e) => {
+                      setLogoUrl(e.target.value)
+                      setLogoError(false)
+                    }}
                     placeholder="https://ejemplo.com/logo.png"
                     className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
                   />
@@ -1671,35 +1708,32 @@ export default function ConfigClient({
             <div className="space-y-2">
               <label className="text-sm font-semibold text-white block">URL de Imagen de Fondo (Opcional)</label>
               
-              {(() => {
-                try {
-                  new URL(bannerUrl);
-                  return (
-                    <div className="relative w-full h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 mb-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={bannerUrl}
-                        alt="Vista previa del fondo"
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{ opacity: bannerOpacity }}
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                      />
-                      <div className="relative z-10 flex items-center justify-center h-full">
-                        <span className="text-[10px] text-neutral-400 bg-black/40 px-2 py-1 rounded">
-                          Vista previa · opacidad {Math.round(bannerOpacity * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                  )
-                } catch {
-                  return null
-                }
-              })()}
+              {bannerUrl.trim() && !bannerError ? (
+                <div className="relative w-full h-24 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950 mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={bannerUrl}
+                    src={bannerUrl}
+                    alt="Vista previa del fondo"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ opacity: bannerOpacity }}
+                    onError={() => setBannerError(true)}
+                  />
+                  <div className="relative z-10 flex items-center justify-center h-full">
+                    <span className="text-[10px] text-neutral-400 bg-black/40 px-2 py-1 rounded">
+                      Vista previa · opacidad {Math.round(bannerOpacity * 100)}%
+                    </span>
+                  </div>
+                </div>
+              ) : null}
 
               <input
                 type="text"
                 value={bannerUrl}
-                onChange={(e) => setBannerUrl(e.target.value)}
+                onChange={(e) => {
+                  setBannerUrl(e.target.value)
+                  setBannerError(false)
+                }}
                 placeholder="https://ejemplo.com/fondo.jpg"
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
               />

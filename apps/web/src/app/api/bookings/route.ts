@@ -107,6 +107,7 @@ export async function POST(req: Request) {
     let calcomUid: string | null = null
     let confirmationCode: string
 
+    const tableType = branch.tableTypes[0]
     const timezone = branch.restaurant.timezone || "America/Bogota"
     const dateTime = parseLocalDateInTimezone(date, time, timezone)
 

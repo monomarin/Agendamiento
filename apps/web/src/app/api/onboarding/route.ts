@@ -3,6 +3,8 @@ import { auth, currentUser } from "@clerk/nextjs/server"
 
 import prisma from "@/lib/prisma"
 import { encrypt } from "@/lib/encryption"
+import { setUserPublicMetadata } from "@/lib/clerk-metadata"
+import { logAuditEvent, extractIpAddress } from "@/lib/audit"
 
 // Helper to register Event Type in self-hosted Cal.com v2
 async function createCalcomEventType(
@@ -259,6 +261,27 @@ export async function POST(req: Request) {
         })
       }
     }
+
+    // 5. Update Clerk publicMetadata so the JWT carries role + restaurantId
+    await setUserPublicMetadata(clerkUserId, {
+      role: "OWNER",
+      restaurantId: result.restaurant.id,
+      restaurantSlug: result.restaurant.slug,
+    })
+
+    // 6. Register audit event
+    await logAuditEvent({
+      actorId: clerkUserId,
+      actorRole: "OWNER",
+      restaurantId: result.restaurant.id,
+      eventType: "restaurant.created",
+      resourceType: "Restaurant",
+      resourceId: result.restaurant.id,
+      ipAddress: extractIpAddress(req),
+      userAgent: req.headers.get("user-agent"),
+      metadata: { restaurantName: result.restaurant.name, slug: result.restaurant.slug },
+      severity: "INFO",
+    })
 
     return NextResponse.json({
       success: true,

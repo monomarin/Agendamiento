@@ -32,6 +32,7 @@ enum BookingSource {
 }
 
 enum Role {
+  SUPER_ADMIN
   OWNER
   MANAGER
   HOSTESS
@@ -90,6 +91,7 @@ model Restaurant {
   // Relations
   users             User[]
   staffMembers      StaffMember[]
+  staffInvitations  StaffInvitation[]
   branches          Branch[]
   paymentSettings   PaymentSettings?
   webhooks          Webhook[]
@@ -394,4 +396,48 @@ model CommunicationLog {
 
   @@index([restaurantId])
   @@index([createdAt])
+}
+
+// ─── Staff Invitations ────────────────────────────────────────────────────────
+// Token de un solo uso que el tenant_admin envía al staff para unirse al tenant.
+model StaffInvitation {
+  id           String     @id @default(uuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  email        String
+  role         Role       @default(WAITER)
+  permissions  String[]   @default([]) // permisos granulares opcionales
+  token        String     @unique      // UUID v4, single-use
+  expiresAt    DateTime               // +72h desde creación
+  usedAt       DateTime?              // null = pendiente, fecha = aceptada
+  invitedById  String                 // clerkUserId del tenant_admin que invitó
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId])
+  @@index([token])
+  @@index([email])
+}
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+// Bitácora inmutable de eventos críticos del sistema.
+// IMPORTANTE: Nunca borrar ni modificar registros de esta tabla.
+model AuditLog {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  actorId      String?  // clerkUserId del usuario que realizó la acción
+  actorRole    String?  // rol en el momento de la acción
+  restaurantId String?  // null si es evento global de plataforma
+  eventType    String   // e.g. "auth.login", "reservation.cancelled", "staff.invited"
+  resourceType String?  // tabla o entidad afectada: "Booking", "StaffMember", etc.
+  resourceId   String?  // ID del recurso afectado
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?    // JSON con detalles adicionales del evento
+  severity     String   @default("INFO") // INFO | WARN | CRITICAL
+
+  @@index([restaurantId])
+  @@index([actorId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([severity])
 }

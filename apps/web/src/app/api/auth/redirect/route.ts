@@ -27,12 +27,19 @@ export async function GET() {
         `${clerkUser?.firstName ?? ""} ${clerkUser?.lastName ?? ""}`.trim() || "Usuario",
       role: "OWNER",
     },
-    select: { restaurantId: true },
+    select: { restaurantId: true, role: true },
   })
 
+  // SUPER_ADMIN → panel de administración
+  if (user.role === "SUPER_ADMIN") {
+    redirect("/admin")
+  }
+
+  // Usuario con restaurante → dashboard
   if (user.restaurantId) {
     redirect("/dashboard")
-  } else {
-    redirect("/onboarding")
   }
+
+  // Usuario nuevo → onboarding
+  redirect("/onboarding")
 }

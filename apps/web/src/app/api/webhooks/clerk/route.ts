@@ -70,22 +70,32 @@ export async function POST(req: NextRequest) {
       const email = email_addresses?.[0]?.email_address ?? ""
       const name = [first_name, last_name].filter(Boolean).join(" ") || "Usuario"
 
-      // Crear usuario en Prisma si no existe (upsert seguro)
-      await prisma.user.upsert({
-        where: { clerkUserId },
-        update: {},
-        create: {
-          clerkUserId,
-          email,
-          name,
-          role: "OWNER",
-          // restaurantId se asignará durante el onboarding
-        },
-      })
+      // Primero buscar si ya existe un usuario con ese email (ej: SUPER_ADMIN pre-creado)
+      const existingByEmail = await prisma.user.findUnique({ where: { email } })
+
+      if (existingByEmail && existingByEmail.clerkUserId !== clerkUserId) {
+        // Vincular el clerkUserId real sin pisar el rol existente
+        await prisma.user.update({
+          where: { email },
+          data: { clerkUserId },
+        })
+      } else {
+        // Crear usuario nuevo como OWNER
+        await prisma.user.upsert({
+          where: { clerkUserId },
+          update: {},
+          create: {
+            clerkUserId,
+            email,
+            name,
+            role: "OWNER",
+          },
+        })
+      }
 
       await logAuditEvent({
         actorId: clerkUserId,
-        actorRole: "OWNER",
+        actorRole: existingByEmail?.role ?? "OWNER",
         eventType: "auth.user_created",
         resourceType: "User",
         resourceId: clerkUserId,

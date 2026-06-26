@@ -4,42 +4,56 @@ import prisma from "@/lib/prisma"
 
 /**
  * GET /api/auth/redirect
- * Smart post-auth redirect: checks if authenticated user has a restaurant.
- * Used as afterSignInUrl so the app routes correctly after login.
+ * Smart post-auth redirect: routes users to the correct page after login.
+ * - SUPER_ADMIN → /admin
+ * - User with restaurant → /dashboard
+ * - New user → /onboarding
  */
 export async function GET() {
   const { userId } = await auth()
+  if (!userId) redirect("/sign-in")
 
-  if (!userId) {
-    redirect("/sign-in")
-  }
-
-  // Upsert user to ensure they exist in the DB (webhook may not have fired yet)
   const clerkUser = await currentUser()
+  const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? ""
 
-  const user = await prisma.user.upsert({
-    where: { clerkUserId: userId },
-    update: {},
-    create: {
-      clerkUserId: userId,
-      email: clerkUser?.emailAddresses?.[0]?.emailAddress ?? "",
-      name:
-        `${clerkUser?.firstName ?? ""} ${clerkUser?.lastName ?? ""}`.trim() || "Usuario",
-      role: "OWNER",
-    },
+  // 1. Buscar por clerkUserId (caso normal)
+  let user = await prisma.user.findUnique({
+    where: { clerkUserId: userId! },
     select: { restaurantId: true, role: true },
   })
 
-  // SUPER_ADMIN → panel de administración
-  if (user.role === "SUPER_ADMIN") {
-    redirect("/admin")
+  // 2. Si no existe por clerkUserId, buscar por email (admin pre-creado o primer login)
+  if (!user && email) {
+    const byEmail = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, restaurantId: true, role: true, clerkUserId: true },
+    })
+
+    if (byEmail) {
+      // Vincular clerkUserId real al registro existente (ej: SUPER_ADMIN pre-creado)
+      await prisma.user.update({
+        where: { email },
+        data: { clerkUserId: userId! },
+      })
+      user = { restaurantId: byEmail.restaurantId, role: byEmail.role }
+    }
   }
 
-  // Usuario con restaurante → dashboard
-  if (user.restaurantId) {
-    redirect("/dashboard")
+  // 3. Si aún no existe, crear como OWNER nuevo
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        clerkUserId: userId!,
+        email,
+        name: `${clerkUser?.firstName ?? ""} ${clerkUser?.lastName ?? ""}`.trim() || "Usuario",
+        role: "OWNER",
+      },
+      select: { restaurantId: true, role: true },
+    })
   }
 
-  // Usuario nuevo → onboarding
+  // Routing según rol y estado
+  if (user.role === "SUPER_ADMIN") redirect("/admin")
+  if (user.restaurantId) redirect("/dashboard")
   redirect("/onboarding")
 }

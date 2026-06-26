@@ -27,8 +27,8 @@ export default function RootLayout({
     <ClerkProvider
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
-      afterSignInUrl="/api/auth/redirect"
-      afterSignUpUrl="/api/auth/redirect"
+      signInForceRedirectUrl="/api/auth/redirect"
+      signUpForceRedirectUrl="/api/auth/redirect"
     >
       <html
         lang="es"

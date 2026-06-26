@@ -57,6 +57,7 @@ export default function SignUpPage() {
           </div>
 
           <SignUp
+            forceRedirectUrl="/api/auth/redirect"
             appearance={{
               variables: {
                 colorPrimary: "#dc2626",

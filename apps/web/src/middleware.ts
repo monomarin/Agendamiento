@@ -13,15 +13,16 @@ const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/onboarding(.*)",
   "/admin(.*)",
+  "/api/auth/redirect",
 ])
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth()
 
-  // Si ya está autenticado y quiere ir a sign-in o sign-up → redirigir al dashboard
+  // Si ya está autenticado y quiere ir a sign-in o sign-up → redirigir vía smart redirect
   const url = req.nextUrl.pathname
   if (userId && (url.startsWith("/sign-in") || url.startsWith("/sign-up"))) {
-    return NextResponse.redirect(new URL("/dashboard", req.url))
+    return NextResponse.redirect(new URL("/api/auth/redirect", req.url))
   }
 
   // Rutas protegidas: requieren sesión activa de Clerk

@@ -43,9 +43,20 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     redirect("/sign-in")
   }
 
-  // Look up the user's restaurant
-  const user = await prisma.user.findUnique({
+  // Upsert user in DB — resilient fallback in case webhook hasn't fired yet
+  const clerkUserData = await import("@clerk/nextjs/server").then((m) => m.currentUser())
+
+  const user = await prisma.user.upsert({
     where: { clerkUserId: userId },
+    update: {},
+    create: {
+      clerkUserId: userId,
+      email: clerkUserData?.emailAddresses?.[0]?.emailAddress ?? "",
+      name:
+        `${clerkUserData?.firstName ?? ""} ${clerkUserData?.lastName ?? ""}`.trim() ||
+        "Usuario",
+      role: "OWNER",
+    },
     include: {
       restaurant: { select: { id: true, name: true, slug: true, primaryColor: true } },
     },

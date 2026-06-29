@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+import { NextResponse, NextRequest } from "next/server"
 import prisma from "@/lib/prisma"
 
 /**
@@ -9,9 +9,11 @@ import prisma from "@/lib/prisma"
  * - User with restaurant → /dashboard
  * - New user → /onboarding
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { userId } = await auth()
-  if (!userId) redirect("/sign-in")
+  if (!userId) {
+    return NextResponse.redirect(new URL("/sign-in", req.url))
+  }
 
   const clerkUser = await currentUser()
   const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? ""
@@ -53,7 +55,11 @@ export async function GET() {
   }
 
   // Routing según rol y estado
-  if (user.role === "SUPER_ADMIN") redirect("/admin")
-  if (user.restaurantId) redirect("/dashboard")
-  redirect("/onboarding")
+  if (user.role === "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/admin", req.url))
+  }
+  if (user.restaurantId) {
+    return NextResponse.redirect(new URL("/dashboard", req.url))
+  }
+  return NextResponse.redirect(new URL("/onboarding", req.url))
 }

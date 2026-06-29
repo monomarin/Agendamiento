@@ -111,7 +111,15 @@ export async function POST(req: Request) {
     const timezone = branch.restaurant.timezone || "America/Bogota"
     const dateTime = parseLocalDateInTimezone(date, time, timezone)
 
-    if (calcomApiUrl && calcomApiKey && tableType?.calcomEventId) {
+    const isCalcomConfigured =
+      calcomApiUrl &&
+      calcomApiKey &&
+      calcomApiKey !== "cal_api_key_placeholder" &&
+      !calcomApiUrl.includes("localhost") &&
+      !calcomApiUrl.includes("127.0.0.1") &&
+      tableType?.calcomEventId
+
+    if (isCalcomConfigured) {
       try {
         const calRes = await fetch(`${calcomApiUrl}/bookings`, {
           method: "POST",

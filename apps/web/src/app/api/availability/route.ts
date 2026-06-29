@@ -62,7 +62,14 @@ export async function GET(req: Request) {
 
     let availabilityMap: Record<string, boolean> = {}
 
-    if (calcomApiUrl && calcomApiKey && branch.tableTypes.length > 0) {
+    const isCalcomConfigured =
+      calcomApiUrl &&
+      calcomApiKey &&
+      calcomApiKey !== "cal_api_key_placeholder" &&
+      !calcomApiUrl.includes("localhost") &&
+      !calcomApiUrl.includes("127.0.0.1")
+
+    if (isCalcomConfigured && branch.tableTypes.length > 0) {
       const eventTypeId = branch.tableTypes[0]?.calcomEventId
       if (eventTypeId) {
         try {

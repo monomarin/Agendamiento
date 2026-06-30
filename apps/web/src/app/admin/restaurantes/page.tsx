@@ -17,10 +17,28 @@ export default async function AdminRestaurantesPage() {
   const restaurants = await prisma.restaurant.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { bookings: true, branches: true } },
       users: { take: 1, select: { name: true, email: true } },
+      branches: {
+        select: {
+          id: true,
+          _count: {
+            select: { bookings: true }
+          }
+        }
+      }
     },
   })
+
+  const restaurantsWithCounts = restaurants.map((r) => {
+    const bookingsCount = r.branches.reduce((sum, b) => sum + b._count.bookings, 0)
+    const branchesCount = r.branches.length
+    return {
+      ...r,
+      bookingsCount,
+      branchesCount
+    }
+  })
+
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -48,7 +66,7 @@ export default async function AdminRestaurantesPage() {
               </tr>
             </thead>
             <tbody>
-              {restaurants.map((r) => (
+              {restaurantsWithCounts.map((r) => (
                 <tr key={r.id} className="border-b border-neutral-800/50 hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -80,8 +98,8 @@ export default async function AdminRestaurantesPage() {
                       {r.status === "ACTIVE" ? "Activo" : r.status === "SUSPENDED" ? "Suspendido" : r.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right text-neutral-300">{r._count.branches}</td>
-                  <td className="px-6 py-4 text-right text-neutral-300 font-semibold">{r._count.bookings}</td>
+                  <td className="px-6 py-4 text-right text-neutral-300">{r.branchesCount}</td>
+                  <td className="px-6 py-4 text-right text-neutral-300 font-semibold">{r.bookingsCount}</td>
                   <td className="px-6 py-4 text-right text-neutral-500 text-xs">
                     {format(new Date(r.createdAt), "dd MMM yyyy", { locale: es })}
                   </td>
@@ -97,7 +115,7 @@ export default async function AdminRestaurantesPage() {
                   </td>
                 </tr>
               ))}
-              {restaurants.length === 0 && (
+              {restaurantsWithCounts.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-neutral-600 text-sm">
                     No hay restaurantes registrados.

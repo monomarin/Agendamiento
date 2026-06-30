@@ -40,11 +40,26 @@ export default async function AdminPage() {
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
-        _count: { select: { bookings: true } },
         users: { take: 1, select: { name: true, email: true } },
+        branches: {
+          select: {
+            _count: {
+              select: { bookings: true }
+            }
+          }
+        }
       },
     }),
   ])
+
+  const recentRestaurantsWithCounts = recentRestaurants.map((r) => {
+    const bookingsCount = r.branches.reduce((sum, b) => sum + b._count.bookings, 0)
+    return {
+      ...r,
+      bookingsCount
+    }
+  })
+
 
   const stats = [
     {
@@ -142,7 +157,7 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {recentRestaurants.map((r) => (
+              {recentRestaurantsWithCounts.map((r) => (
                 <tr
                   key={r.id}
                   className="border-b border-neutral-800/50 hover:bg-white/[0.02] transition-colors"
@@ -178,14 +193,14 @@ export default async function AdminPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right text-neutral-300 font-semibold">
-                    {r._count.bookings}
+                    {r.bookingsCount}
                   </td>
                   <td className="px-6 py-4 text-right text-neutral-500 text-xs">
                     {format(new Date(r.createdAt), "dd MMM yyyy", { locale: es })}
                   </td>
                 </tr>
               ))}
-              {recentRestaurants.length === 0 && (
+              {recentRestaurantsWithCounts.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-neutral-600 text-sm">
                     No hay restaurantes registrados aún.

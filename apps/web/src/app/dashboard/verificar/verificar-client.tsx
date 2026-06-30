@@ -156,24 +156,48 @@ export default function VerificarClient({ restaurantId }: { restaurantId: string
                 }
               }
             } catch (e) {
-              // Not a valid URL, maybe it's just the booking ID or code itself
-              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-              if (uuidRegex.test(dataUrl)) {
+              // Not a valid URL. Let's parse structured text details or fallback
+              const urlMatch = dataUrl.match(/Enlace de Verificación:\s*(https?:\/\/[^\s]+)/)
+              const codeMatch = dataUrl.match(/Reserva:\s*([^\s\n]+)/)
+              
+              if (urlMatch) {
+                try {
+                  const urlObj = new URL(urlMatch[1])
+                  const refId = urlObj.searchParams.get("ref")
+                  if (refId) {
+                    stopCamera()
+                    setScanning(false)
+                    fetchBooking(refId, null)
+                    return
+                  }
+                } catch (_) {}
+              }
+              
+              if (codeMatch) {
                 stopCamera()
                 setScanning(false)
-                fetchBooking(dataUrl, null)
+                fetchBooking(null, codeMatch[1].trim())
                 return
-              } else if (dataUrl.trim().length >= 6 && dataUrl.trim().length <= 12) {
+              }
+
+              // Fallback: check for UUID or raw code format
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+              if (uuidRegex.test(dataUrl.trim())) {
+                stopCamera()
+                setScanning(false)
+                fetchBooking(dataUrl.trim(), null)
+                return
+              } else if (dataUrl.trim().length >= 6 && dataUrl.trim().length <= 15) {
                 stopCamera()
                 setScanning(false)
                 fetchBooking(null, dataUrl.trim())
                 return
               }
             }
-          }
-        }
-      }
-    }
+          }  // end if (codeResult)
+        }  // end if (window.jsQR)
+      }  // end if (context)
+    }  // end if (videoRef...)
     if (scanning) {
       animationFrameId.current = requestAnimationFrame(tick)
     }

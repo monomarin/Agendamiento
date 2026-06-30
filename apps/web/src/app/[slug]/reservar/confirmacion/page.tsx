@@ -40,9 +40,22 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
   React.useEffect(() => {
     if (!bookingId) return
     const bookingUrl = `${window.location.origin}/${slug}/reservar/consulta?ref=${bookingId}`
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(bookingUrl)}&color=FFFFFF&bgcolor=0A0A0A&margin=2`
+    
+    // Structured text details inside the QR code
+    const qrText = [
+      `Reserva: ${confirmationCode || "—"}`,
+      `Cliente: ${customer?.name || "—"}`,
+      `Fecha: ${formattedDate}`,
+      `Hora: ${selectedTime || "—"}`,
+      `Personas: ${partySize || "—"}`,
+      `Evento: ${eventType || "Reserva estándar"}`,
+      `Enlace de Verificación: ${bookingUrl}`
+    ].join("\n")
+
+    // Standard black QR code on white background for high camera compatibility
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrText)}&color=000000&bgcolor=FFFFFF&margin=2`
     setQrUrl(qrApiUrl)
-  }, [bookingId, slug])
+  }, [bookingId, slug, confirmationCode, customer, formattedDate, selectedTime, partySize, eventType])
 
   // Trigger confetti animation once
   React.useEffect(() => {

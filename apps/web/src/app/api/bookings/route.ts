@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { redis, getRatelimit } from "@/lib/redis"
 import prisma from "@/lib/prisma"
+import { sendBookingConfirmationEmail } from "@/lib/email"
 
 // Rate limit: 5 bookings per IP per hour
 const ratelimit = getRatelimit(5, "1 h", "bookings-ratelimit")
@@ -200,6 +201,21 @@ export async function POST(req: Request) {
         status: "CONFIRMED",
       },
     })
+
+    // 8.5 Send Email Confirmation (asynchronously in the background)
+    sendBookingConfirmationEmail({
+      toEmail: dbCustomer.email,
+      customerName: dbCustomer.name,
+      confirmationCode,
+      dateTime,
+      partySize,
+      specialRequests: specialRequests || null,
+      branchName: branch.name,
+      restaurantName: branch.restaurant.name,
+      restaurantType: branch.restaurant.type,
+      bookingId: booking.id,
+      slug: branch.restaurant.slug,
+    }).catch(err => console.error("Failed to send booking confirmation email:", err))
 
     // 9. Check if payment is required
     const paymentSettings = branch.restaurant.paymentSettings

@@ -23,6 +23,19 @@ export async function GET(
     return NextResponse.json({ error: "Restaurant not found" }, { status: 404 })
   }
 
+  // Dynamic self-repair logic for clinicadental type
+  if (slug.toLowerCase() === "clinicadental" && restaurant.type !== "clinica_dental") {
+    try {
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { type: "clinica_dental" }
+      })
+      restaurant.type = "clinica_dental"
+    } catch (e) {
+      console.error("Failed to repair restaurant type:", e)
+    }
+  }
+
   const now = new Date()
   const currentDay = now.getDay()
   const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`

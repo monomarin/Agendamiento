@@ -27,6 +27,7 @@ interface BookingState {
   payment: PaymentData | null
   bookingId: string | null
   confirmationCode: string | null
+  restaurantType: string | null
   
   // Actions
   setStep: (step: number) => void
@@ -40,6 +41,7 @@ interface BookingState {
   setPayment: (payment: PaymentData | null) => void
   setBookingId: (id: string | null) => void
   setConfirmationCode: (code: string | null) => void
+  setRestaurantType: (type: string | null) => void
   reset: () => void
 }
 
@@ -57,6 +59,7 @@ export const useBookingStore = create<BookingState>()(
       payment: null,
       bookingId: null,
       confirmationCode: null,
+      restaurantType: null,
 
       setStep: (step) => set({ currentStep: step }),
       setSelectedBranchId: (branchId) => set({ selectedBranchId: branchId }),
@@ -69,6 +72,7 @@ export const useBookingStore = create<BookingState>()(
       setPayment: (payment) => set({ payment }),
       setBookingId: (id) => set({ bookingId: id }),
       setConfirmationCode: (code) => set({ confirmationCode: code }),
+      setRestaurantType: (type) => set({ restaurantType: type }),
       
       reset: () => set({
         currentStep: 1,
@@ -82,6 +86,7 @@ export const useBookingStore = create<BookingState>()(
         payment: null,
         bookingId: null,
         confirmationCode: null,
+        restaurantType: null,
       })
     }),
     {

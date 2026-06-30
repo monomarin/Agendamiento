@@ -84,11 +84,12 @@ export default function PersonasPage({ params }: PersonasPageProps) {
     setSelectedDate,
     setSelectedTime,
     setStep,
+    restaurantType,
+    setRestaurantType,
   } = useBookingStore()
 
   // 1. Fetch branches on mount to auto-select if missing
   const [branches, setBranches] = React.useState<any[]>([])
-  const [restaurantType, setRestaurantType] = React.useState<string | null>(null)
   React.useEffect(() => {
     const branchIdParam = searchParams.get("branchId")
     if (branchIdParam) {
@@ -255,14 +256,14 @@ export default function PersonasPage({ params }: PersonasPageProps) {
           <div className="space-y-1">
             <h2 className="text-md font-bold text-white flex items-center gap-2">
               <Users className="w-4 h-4 text-[var(--primary)]" />
-              1. ¿Cuántas {typeConfig.partySizeLabel.toLowerCase()}?
+              1. {typeConfig.partySizeQuestion}
             </h2>
             <p className="text-neutral-500 text-[11px]">{typeConfig.partySizeSublabel}</p>
           </div>
 
           {/* Party size circles */}
           <div className="grid grid-cols-5 gap-2">
-            {Array.from({ length: 15 }, (_, i) => i + 1).map((size) => (
+            {Array.from({ length: typeConfig.maxPartySize }, (_, i) => i + 1).map((size) => (
               <button
                 key={size}
                 onClick={() => handlePartySizeClick(size)}
@@ -275,25 +276,27 @@ export default function PersonasPage({ params }: PersonasPageProps) {
                 {size}
               </button>
             ))}
-            <button
-              onClick={handleMoreClick}
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-200 border focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${
-                showMoreInput
-                  ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[0_0_12px_var(--primary)/30]"
-                  : "border-neutral-800 bg-neutral-950/60 text-neutral-400 hover:border-neutral-700"
-              }`}
-            >
-              +
-            </button>
+            {typeConfig.maxPartySize >= 8 && (
+              <button
+                onClick={handleMoreClick}
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-200 border focus:outline-none focus:ring-1 focus:ring-[var(--primary)] ${
+                  showMoreInput
+                    ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-[0_0_12px_var(--primary)/30]"
+                    : "border-neutral-800 bg-neutral-950/60 text-neutral-400 hover:border-neutral-700"
+                }`}
+              >
+                +
+              </button>
+            )}
           </div>
 
-          {/* More than 15 count editor */}
-          {showMoreInput && (
+          {/* More than maxPartySize count editor */}
+          {showMoreInput && typeConfig.maxPartySize >= 8 && (
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-950 border border-neutral-800">
-              <span className="text-[11px] text-neutral-400">Total comensales:</span>
+              <span className="text-[11px] text-neutral-400">Total:</span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setPartySize(Math.max(16, partySize - 1))}
+                  onClick={() => setPartySize(Math.max(typeConfig.maxPartySize + 1, partySize - 1))}
                   className="w-7 h-7 rounded-lg border border-neutral-700 bg-neutral-800 flex items-center justify-center text-white hover:bg-neutral-700"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -309,10 +312,10 @@ export default function PersonasPage({ params }: PersonasPageProps) {
             </div>
           )}
 
-          {/* WhatsApp redirect when size > 15 */}
-          {partySize > 15 && (
+          {/* WhatsApp redirect when size > maxPartySize */}
+          {partySize > typeConfig.maxPartySize && typeConfig.maxPartySize >= 8 && (
             <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] space-y-2">
-              <p>Para reservas de más de 15 personas, contáctanos directamente por WhatsApp.</p>
+              <p>Para reservas de grupos grandes, contáctanos directamente por WhatsApp.</p>
               <a
                 href={whatsappUrl}
                 target="_blank"
@@ -338,6 +341,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
                       : "border-neutral-850 bg-neutral-950/20 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300"
                   }`}
                 >
+                  <span className="block text-xs mb-0.5">{event.emoji}</span>
                   <span className="truncate block font-medium">{event.label}</span>
                 </button>
               ))}
@@ -396,13 +400,16 @@ export default function PersonasPage({ params }: PersonasPageProps) {
               <CalendarDays className="w-4 h-4 text-[var(--primary)]" />
               2. Selecciona la fecha
             </h2>
-            <p className="text-neutral-500 text-[11px]">Escoge el día de tu reserva.</p>
+            <p className="text-neutral-500 text-[11px]">Escoge el día.</p>
           </div>
 
           {/* Dots Legend */}
           <div className="flex items-center gap-3 text-[9px] text-neutral-500 select-none pb-1">
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Disponible</span>
-            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Pocas mesas</span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              {typeConfig.value === "restaurante" || typeConfig.value === "bar" || typeConfig.value === "cafe" || typeConfig.value === "fast_food" ? "Pocas mesas" : "Pocos cupos"}
+            </span>
             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />Lleno</span>
           </div>
 
@@ -486,7 +493,11 @@ export default function PersonasPage({ params }: PersonasPageProps) {
           ) : slotsLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-[11px] text-neutral-500 gap-2">
               <Loader2 className="w-5 h-5 text-[var(--primary)] animate-spin" />
-              <span>Buscando mesas libres...</span>
+              <span>
+                {typeConfig.value === "restaurante" || typeConfig.value === "bar" || typeConfig.value === "cafe" || typeConfig.value === "fast_food"
+                  ? "Buscando mesas libres..."
+                  : "Buscando citas libres..."}
+              </span>
             </div>
           ) : slotsError ? (
             <div className="p-3.5 rounded-xl border border-red-950/20 bg-red-950/10 text-red-400 text-xs flex items-center gap-2">
@@ -509,7 +520,9 @@ export default function PersonasPage({ params }: PersonasPageProps) {
                 </div>
               ) : dayData.slots.length === 0 ? (
                 <div className="p-4 border border-neutral-850 bg-neutral-950/30 text-center text-neutral-500 text-xs rounded-xl">
-                  No hay mesas disponibles para {partySize} personas.
+                  {typeConfig.value === "restaurante" || typeConfig.value === "bar" || typeConfig.value === "cafe" || typeConfig.value === "fast_food"
+                    ? `No hay mesas disponibles para ${partySize} personas.`
+                    : `No hay citas disponibles para ${partySize} ${typeConfig.partySizeLabel.toLowerCase()}.`}
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2 overflow-y-auto max-h-[220px] pr-1">

@@ -1,4 +1,6 @@
 import { Resend } from "resend"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -148,5 +150,135 @@ export async function sendStaffInvitationEmail(params: {
   } catch (error) {
     console.error("[Email] Error al enviar invitación de staff:", error)
     throw error
+  }
+}
+
+/**
+ * Sends a booking confirmation email to the customer with all details.
+ */
+export async function sendBookingConfirmationEmail(params: {
+  toEmail: string
+  customerName: string
+  confirmationCode: string
+  dateTime: Date
+  partySize: number
+  specialRequests: string | null
+  branchName: string
+  restaurantName: string
+  restaurantType: string
+  bookingId: string
+  slug: string
+}) {
+  const {
+    toEmail,
+    customerName,
+    confirmationCode,
+    dateTime,
+    partySize,
+    specialRequests,
+    branchName,
+    restaurantName,
+    restaurantType,
+    bookingId,
+    slug
+  } = params
+
+  const isRestaurant = restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food"
+  const isClinic = restaurantType === "clinica_dental" || restaurantType === "consultorio_medico" || restaurantType === "eps_ips" || restaurantType === "psicologia" || restaurantType === "nutricion" || restaurantType === "fisioterapia" || restaurantType === "laboratorio"
+  
+  const appointmentWord = isRestaurant ? "reserva" : "cita"
+  const attendeesWord = isRestaurant ? "personas" : isClinic ? "pacientes" : "personas"
+  
+  const formattedDate = format(new Date(dateTime), "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
+  const formattedTime = format(new Date(dateTime), "HH:mm 'hs'", { locale: es })
+
+  const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://iagendapp.vercel.app"}/${slug}/reservar/consulta?ref=${bookingId}`
+
+  if (!resend || process.env.RESEND_API_KEY === "re_placeholder") {
+    console.log(
+      `[MOCK EMAIL] Confirmación de ${appointmentWord} enviado a ${toEmail}: código ${confirmationCode}`
+    )
+    return { id: "mock-email-id" }
+  }
+
+  try {
+    const result = await resend.emails.send({
+      from: "iAgenda <no-reply@resend.dev>",
+      to: toEmail,
+      subject: `Confirmación de tu ${appointmentWord} - ${restaurantName}`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #262626;">
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #1f1f1f 0%, #0a0a0a 100%); padding: 32px 40px; border-bottom: 1px solid #262626; text-align: center;">
+            <span style="font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em;">
+              iAgend<span style="color: #dc2626;">app</span>
+            </span>
+          </div>
+
+          <!-- Body -->
+          <div style="padding: 40px;">
+            <h1 style="color: #10b981; font-size: 22px; margin: 0 0 16px 0; font-weight: 700; text-align: center;">
+              ¡Tu ${appointmentWord} está confirmada! 🎉
+            </h1>
+            <p style="color: #a3a3a3; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0; text-align: center;">
+              Hola <strong>${customerName}</strong>, tu ${appointmentWord} en <strong>${restaurantName}</strong> (${branchName}) ha sido confirmada con éxito.
+            </p>
+
+            <!-- Code Box -->
+            <div style="background: #171717; border: 1px solid #262626; border-radius: 10px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+              <span style="color: #737373; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 6px;">Código de confirmación</span>
+              <strong style="color: #10b981; font-size: 24px; font-family: monospace; letter-spacing: 0.15em;">${confirmationCode}</strong>
+            </div>
+
+            <!-- Details Table -->
+            <div style="background: #171717; border: 1px solid #262626; border-radius: 10px; padding: 24px; margin: 0 0 32px 0;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <tr>
+                  <td style="color: #737373; padding: 6px 0; width: 35%;">Fecha:</td>
+                  <td style="color: #ffffff; padding: 6px 0; font-weight: 600; text-transform: capitalize;">${formattedDate}</td>
+                </tr>
+                <tr>
+                  <td style="color: #737373; padding: 6px 0;">Hora:</td>
+                  <td style="color: #ffffff; padding: 6px 0; font-weight: 600;">${formattedTime}</td>
+                </tr>
+                <tr>
+                  <td style="color: #737373; padding: 6px 0;">Asistentes:</td>
+                  <td style="color: #ffffff; padding: 6px 0; font-weight: 600;">${partySize} ${partySize === 1 ? attendeesWord.slice(0, -1) : attendeesWord}</td>
+                </tr>
+                ${specialRequests ? `
+                <tr>
+                  <td style="color: #737373; padding: 6px 0;">Notas:</td>
+                  <td style="color: #ffffff; padding: 6px 0; font-weight: 500;">${specialRequests}</td>
+                </tr>
+                ` : ""}
+              </table>
+            </div>
+
+            <!-- CTA -->
+            <div style="text-align: center; margin: 0 0 32px 0;">
+              <a href="${bookingUrl}"
+                style="display: inline-block; background: #dc2626; color: #ffffff; text-decoration: none; padding: 14px 36px; border-radius: 8px; font-weight: 700; font-size: 15px; box-shadow: 0 0 20px rgba(220,38,38,0.35);">
+                Ver ticket con código QR
+              </a>
+            </div>
+
+            <p style="color: #525252; font-size: 12px; text-align: center; margin: 0;">
+              Presenta el código QR adjunto en el enlace al llegar al establecimiento para un rápido registro de entrada.
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 20px 40px; border-top: 1px solid #1a1a1a; background: #050505;">
+            <p style="color: #404040; font-size: 11px; margin: 0; text-align: center;">
+              © ${new Date().getFullYear()} iAgendapp · Mensaje automático, no respondas a este correo.
+            </p>
+          </div>
+        </div>
+      `,
+    })
+    console.log(`[Email] Confirmación de reserva enviada a ${toEmail}`)
+    return result
+  } catch (error) {
+    console.error("[Email] Error al enviar confirmación de reserva:", error)
   }
 }

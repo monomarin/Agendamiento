@@ -45,6 +45,7 @@ export default function PagoPage({ params }: PagoPageProps) {
     setBookingId,
     setConfirmationCode,
     setStep,
+    restaurantType,
   } = store
 
   const [sagaState, setSagaState] = React.useState<SagaState>("idle")
@@ -248,7 +249,7 @@ export default function PagoPage({ params }: PagoPageProps) {
             Garantía de Reserva
           </h3>
           <p className="text-sm text-neutral-300">
-            Este restaurante requiere un depósito de garantía de{" "}
+            Este {restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food" ? "restaurante" : "establecimiento"} requiere un depósito de garantía de{" "}
             <strong className="text-white">{depositLabel}</strong> para confirmar la reserva.
             Este monto se aplica a tu cuenta al llegar.
           </p>
@@ -262,7 +263,7 @@ export default function PagoPage({ params }: PagoPageProps) {
       {!requiresPayment && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>Este restaurante no requiere depósito. La reserva es completamente gratis.</span>
+          <span>Este {restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food" ? "restaurante" : "establecimiento"} no requiere depósito. La reserva es completamente gratis.</span>
         </div>
       )}
 

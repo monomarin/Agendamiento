@@ -149,7 +149,9 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">¡Reserva Confirmada!</h2>
           <p className="text-neutral-400 text-sm mt-1">
-            Tu mesa está reservada. Te esperamos con gusto.
+            {restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food"
+              ? "Tu mesa está reservada. Te esperamos con gusto."
+              : "Tu cita está confirmada. Te esperamos con gusto."}
           </p>
         </div>
         {confirmationCode && (

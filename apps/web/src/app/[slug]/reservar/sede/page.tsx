@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { MapPin, Clock, ArrowRight, Navigation } from "lucide-react"
 
 import { useBookingStore } from "@/lib/booking-store"
+import { getBranchPlaceholderImage } from "@/lib/business-types"
 
 interface Branch {
   id: string
@@ -22,7 +23,7 @@ interface SedePageProps {
 export default function SedePage({ params }: SedePageProps) {
   const router = useRouter()
   const { slug } = React.use(params)
-  const { setSelectedBranchId, setStep } = useBookingStore()
+  const { setSelectedBranchId, setStep, restaurantType, setRestaurantType } = useBookingStore()
 
   const [branches, setBranches] = React.useState<Branch[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -33,10 +34,13 @@ export default function SedePage({ params }: SedePageProps) {
       .then((r) => r.json())
       .then((data) => {
         setBranches(data.branches || [])
+        if (data.restaurantType) {
+          setRestaurantType(data.restaurantType)
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [slug])
+  }, [slug, setRestaurantType])
 
   const handleSelectBranch = (branchId: string) => {
     setSelectedBranchId(branchId)
@@ -58,7 +62,9 @@ export default function SedePage({ params }: SedePageProps) {
           Selecciona una sede
         </h2>
         <p className="text-neutral-400 text-sm">
-          Elige la ubicación donde deseas reservar tu mesa.
+          {restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food"
+            ? "Elige la ubicación donde deseas reservar tu mesa."
+            : "Elige la ubicación donde deseas agendar tu cita."}
         </p>
       </div>
 
@@ -94,7 +100,7 @@ export default function SedePage({ params }: SedePageProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {filteredBranches.map((branch) => (
+          {filteredBranches.map((branch, index) => (
             <button
               key={branch.id}
               id={`branch-${branch.id}`}
@@ -102,12 +108,16 @@ export default function SedePage({ params }: SedePageProps) {
               className="group p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 text-left hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/5 transition-all duration-200 space-y-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               {/* Branch image placeholder */}
-              <div className="h-24 rounded-lg bg-neutral-800 overflow-hidden relative">
-                <div
-                  className="absolute inset-0 flex items-center justify-center"
-                  style={{ background: `linear-gradient(135deg, var(--primary)22, var(--secondary)44)` }}
-                >
-                  <MapPin className="w-8 h-8 text-neutral-500" />
+              <div className="h-24 rounded-lg bg-neutral-850 overflow-hidden relative border border-neutral-800/30">
+                <img
+                  src={getBranchPlaceholderImage(restaurantType, index)}
+                  alt={branch.name}
+                  className="w-full h-full object-cover opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-350"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent" />
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 text-white/90 text-xs">
+                  <MapPin className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
+                  <span className="font-semibold text-[10px] truncate max-w-[150px]">{branch.name}</span>
                 </div>
               </div>
 
@@ -141,7 +151,9 @@ export default function SedePage({ params }: SedePageProps) {
 
               <div className="flex items-center justify-end">
                 <span className="text-[11px] text-[var(--primary)] font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  Reservar aquí <ArrowRight className="w-3.5 h-3.5" />
+                  {restaurantType === "restaurante" || restaurantType === "bar" || restaurantType === "cafe" || restaurantType === "fast_food"
+                    ? "Reservar aquí"
+                    : "Agendar aquí"} <ArrowRight className="w-3.5 h-3.5" />
                 </span>
               </div>
             </button>

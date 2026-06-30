@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Business types catalog for iAgend.
  * Each type defines event options, special request chips, and UI labels
  * that are contextually appropriate for that type of establishment.
@@ -635,4 +635,40 @@ export function getBusinessTypeConfig(type: string | null | undefined): Business
     return BUSINESS_TYPE_CONFIGS[type]
   }
   return BUSINESS_TYPE_CONFIGS["otro"]
+}
+
+const CATEGORY_IMAGES: Record<string, string[]> = {
+  Gastronomia: [
+    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=500&auto=format&fit=crop&q=60"
+  ],
+  Salud: [
+    "https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1606811971618-4486d14f3f99?w=500&auto=format&fit=crop&q=60"
+  ],
+  "Salud y Belleza": [
+    "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1607779097040-26e80aa78e66?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=60"
+  ],
+  "Servicios Profesionales": [
+    "https://images.unsplash.com/photo-1497366216548-37526070297c?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=500&auto=format&fit=crop&q=60"
+  ]
+}
+
+export function getBranchPlaceholderImage(type: string | null | undefined, index: number): string {
+  const config = getBusinessTypeConfig(type)
+  const images = CATEGORY_IMAGES[config.category] || [
+    "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=500&auto=format&fit=crop&q=60",
+    "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=500&auto=format&fit=crop&q=60"
+  ]
+  return images[index % images.length]
 }

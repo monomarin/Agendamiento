@@ -23,7 +23,7 @@ export async function GET(
     return NextResponse.json({ error: "Restaurant not found" }, { status: 404 })
   }
 
-  // Dynamic self-repair logic for clinicadental type
+  // Dynamic self-repair logic for demo slugs
   if (slug.toLowerCase() === "clinicadental" && restaurant.type !== "clinica_dental") {
     try {
       await prisma.restaurant.update({
@@ -31,6 +31,16 @@ export async function GET(
         data: { type: "clinica_dental" }
       })
       restaurant.type = "clinica_dental"
+    } catch (e) {
+      console.error("Failed to repair restaurant type:", e)
+    }
+  } else if (slug.toLowerCase() === "eps-familiar" && restaurant.type !== "eps_ips") {
+    try {
+      await prisma.restaurant.update({
+        where: { id: restaurant.id },
+        data: { type: "eps_ips" }
+      })
+      restaurant.type = "eps_ips"
     } catch (e) {
       console.error("Failed to repair restaurant type:", e)
     }

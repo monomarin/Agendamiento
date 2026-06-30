@@ -28,6 +28,7 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
     partySize,
     eventType,
     customer,
+    restaurantType,
   } = store
 
   const [qrUrl, setQrUrl] = React.useState<string | null>(null)

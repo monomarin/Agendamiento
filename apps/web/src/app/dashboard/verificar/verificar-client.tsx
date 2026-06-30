@@ -157,7 +157,7 @@ export default function VerificarClient({ restaurantId }: { restaurantId: string
               }
             } catch (e) {
               // Not a valid URL. Let's parse structured text details or fallback
-              const urlMatch = dataUrl.match(/Enlace de Verificación:\s*(https?:\/\/[^\s]+)/)
+              const urlMatch = dataUrl.match(/Enlace de Verificaci[oó]n:\s*(https?:\/\/[^\s]+)/)
               const codeMatch = dataUrl.match(/Reserva:\s*([^\s\n]+)/)
               
               if (urlMatch) {

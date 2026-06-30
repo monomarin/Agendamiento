@@ -10,6 +10,7 @@ import { Users, CalendarDays, Clock, Minus, Plus, MessageSquare, Loader2, AlertC
 
 import { useBookingStore } from "@/lib/booking-store"
 import { Button } from "@/components/ui/button"
+import { getBusinessTypeConfig } from "@/lib/business-types"
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Types & Suggestions
@@ -26,22 +27,7 @@ interface DayAvailability {
   slots: TimeSlot[]
 }
 
-const EVENT_TYPES = [
-  { emoji: "🍽️", label: "Cena casual" },
-  { emoji: "💑", label: "Cena romántica" },
-  { emoji: "🎂", label: "Cumpleaños" },
-  { emoji: "🥂", label: "Aniversario" },
-  { emoji: "💼", label: "Negocios" },
-  { emoji: "🎉", label: "Celebración" },
-]
-
-const SPECIAL_CHIPS = [
-  "Silla para bebé",
-  "Accesibilidad",
-  "Mesa tranquila",
-  "Vista panorámica",
-  "Alergias",
-]
+// EVENT_TYPES and SPECIAL_CHIPS are now dynamically derived from the restaurant type via getBusinessTypeConfig
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Fetchers
@@ -102,6 +88,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
 
   // 1. Fetch branches on mount to auto-select if missing
   const [branches, setBranches] = React.useState<any[]>([])
+  const [restaurantType, setRestaurantType] = React.useState<string | null>(null)
   React.useEffect(() => {
     const branchIdParam = searchParams.get("branchId")
     if (branchIdParam) {
@@ -117,9 +104,15 @@ export default function PersonasPage({ params }: PersonasPageProps) {
             setSelectedBranchId(data.branches[0].id)
           }
         }
+        if (data.restaurantType) {
+          setRestaurantType(data.restaurantType)
+        }
       })
       .catch((err) => console.error("[Loading branches error]:", err))
   }, [slug, selectedBranchId, setSelectedBranchId, searchParams])
+
+  // Derive contextual config from business type
+  const typeConfig = getBusinessTypeConfig(restaurantType)
 
   const today = startOfDay(new Date())
   const maxDate = addDays(today, 60)
@@ -262,9 +255,9 @@ export default function PersonasPage({ params }: PersonasPageProps) {
           <div className="space-y-1">
             <h2 className="text-md font-bold text-white flex items-center gap-2">
               <Users className="w-4 h-4 text-[var(--primary)]" />
-              1. ¿Cuántos personas?
+              1. ¿Cuántas {typeConfig.partySizeLabel.toLowerCase()}?
             </h2>
-            <p className="text-neutral-500 text-[11px]">Selecciona la cantidad de comensales.</p>
+            <p className="text-neutral-500 text-[11px]">{typeConfig.partySizeSublabel}</p>
           </div>
 
           {/* Party size circles */}
@@ -335,7 +328,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
           <div className="border-t border-neutral-900 pt-3 space-y-2">
             <h3 className="text-xs font-semibold text-neutral-300">Tipo de ocasión</h3>
             <div className="grid grid-cols-3 gap-1.5">
-              {EVENT_TYPES.map((event) => (
+              {typeConfig.eventTypes.map((event) => (
                 <button
                   key={event.label}
                   onClick={() => setEventType(event.label)}
@@ -345,7 +338,6 @@ export default function PersonasPage({ params }: PersonasPageProps) {
                       : "border-neutral-850 bg-neutral-950/20 text-neutral-500 hover:border-neutral-700 hover:text-neutral-300"
                   }`}
                 >
-                  <span className="block text-xs mb-0.5">{event.emoji}</span>
                   <span className="truncate block font-medium">{event.label}</span>
                 </button>
               ))}
@@ -359,7 +351,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
               Notas opcionales
             </h3>
             <div className="flex flex-wrap gap-1.5">
-              {SPECIAL_CHIPS.map((chip) => (
+              {typeConfig.specialChips.map((chip) => (
                 <button
                   key={chip}
                   onClick={() => addChip(chip)}
@@ -386,7 +378,7 @@ export default function PersonasPage({ params }: PersonasPageProps) {
             )}
 
             <textarea
-              placeholder="Solicitudes adicionales (alergias, mesa preferida, coche bebé)..."
+              placeholder={typeConfig.specialRequestsPlaceholder}
               value={specialRequests}
               onChange={(e) => setSpecialRequests(e.target.value.slice(0, 500))}
               rows={2}

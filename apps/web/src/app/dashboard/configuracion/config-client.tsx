@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import {
@@ -240,7 +240,7 @@ export default function ConfigClient({
   const handleUpdateBrand = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!restaurantNameState.trim()) {
-      setBrandMessage({ type: "error", text: "El nombre del restaurante es obligatorio." })
+      setBrandMessage({ type: "error", text: "El nombre del establecimiento es obligatorio." })
       return
     }
     setIsSavingBrand(true)
@@ -1439,7 +1439,7 @@ export default function ConfigClient({
                   {initialTables.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-10 text-center text-neutral-500 font-medium">
-                        No hay mesas físicas configuradas en la base de datos para este restaurante.
+                        No hay mesas físicas configuradas en la base de datos para este establecimiento.
                       </td>
                     </tr>
                   ) : (
@@ -1571,7 +1571,7 @@ export default function ConfigClient({
                 type="text"
                 value={restaurantNameState}
                 onChange={(e) => setRestaurantNameState(e.target.value)}
-                placeholder="Nombre del restaurante"
+                placeholder="Nombre del establecimiento"
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
                 required
               />
@@ -1738,7 +1738,7 @@ export default function ConfigClient({
                 className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-red-500 transition-colors"
               />
               <p className="text-[10px] text-neutral-500 mt-1">
-                Imagen de tu restaurante para el fondo decorativo del portal de reservas.
+                Imagen de tu establecimiento para el fondo decorativo del portal de reservas.
               </p>
 
               {/* Opacity slider */}
@@ -1838,3 +1838,4 @@ export default function ConfigClient({
     </div>
   )
 }
+

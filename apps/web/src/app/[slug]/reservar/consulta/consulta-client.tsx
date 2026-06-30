@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { maskName, maskEmail, maskPhone } from "@/lib/privacy-utils"
 
 interface BookingDetails {
   id: string
@@ -166,16 +167,16 @@ export default function ConsultaClient({ booking: initialBooking, isAdmin }: { b
             <div className="space-y-2.5 text-sm text-neutral-300">
               <div className="flex items-center gap-3">
                 <User className="w-4 h-4 text-neutral-500 shrink-0" />
-                <span>{booking.customer.name}</span>
+                <span>{isAdmin ? booking.customer.name : maskName(booking.customer.name)}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Mail className="w-4 h-4 text-neutral-500 shrink-0" />
-                <span className="break-all">{booking.customer.email}</span>
+                <span className="break-all">{isAdmin ? booking.customer.email : maskEmail(booking.customer.email)}</span>
               </div>
               {booking.customer.phone && (
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-neutral-500 shrink-0" />
-                  <span>{booking.customer.phone}</span>
+                  <span>{isAdmin ? booking.customer.phone : maskPhone(booking.customer.phone)}</span>
                 </div>
               )}
             </div>

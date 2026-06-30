@@ -45,5 +45,5 @@ export async function GET(
     }
   })
 
-  return NextResponse.json({ branches })
+  return NextResponse.json({ branches, restaurantType: restaurant.type })
 }

@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server"
+﻿import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -49,7 +49,7 @@ export default async function AdminRestaurantesPage() {
           <Building2 className="w-6 h-6 text-blue-400" />
           Restaurantes
         </h1>
-        <p className="text-neutral-400 text-sm mt-1">{restaurants.length} restaurantes registrados en la plataforma.</p>
+        <p className="text-neutral-400 text-sm mt-1">{restaurants.length} establecimientos registrados en la plataforma.</p>
       </div>
 
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 overflow-hidden">
@@ -128,7 +128,7 @@ export default async function AdminRestaurantesPage() {
               {restaurantsWithCounts.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-neutral-600 text-sm">
-                    No hay restaurantes registrados.
+                    No hay establecimientos registrados.
                   </td>
                 </tr>
               )}
@@ -139,3 +139,4 @@ export default async function AdminRestaurantesPage() {
     </div>
   )
 }
+

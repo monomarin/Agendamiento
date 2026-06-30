@@ -11,6 +11,7 @@ import {
 
 import { useBookingStore } from "@/lib/booking-store"
 import { Button } from "@/components/ui/button"
+import { maskName, maskEmail, maskPhone } from "@/lib/privacy-utils"
 
 interface ConfirmacionPageProps {
   params: Promise<{ slug: string }>
@@ -41,15 +42,15 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
     if (!bookingId) return
     const bookingUrl = `${window.location.origin}/${slug}/reservar/consulta?ref=${bookingId}`
     
-    // Structured text details inside the QR code
+    // Structured text details inside the QR code (use masked data for privacy)
     const qrText = [
       `Reserva: ${confirmationCode || "—"}`,
-      `Cliente: ${customer?.name || "—"}`,
+      `Cliente: ${maskName(customer?.name || "")}`,
       `Fecha: ${formattedDate}`,
       `Hora: ${selectedTime || "—"}`,
       `Personas: ${partySize || "—"}`,
-      `Evento: ${eventType || "Reserva estándar"}`,
-      `Enlace de Verificación: ${bookingUrl}`
+      `Evento: ${eventType || "Reserva estandar"}`,
+      `Enlace de Verificacion: ${bookingUrl}`
     ].join("\n")
 
     // Standard black QR code on white background for high camera compatibility
@@ -181,9 +182,9 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
             </div>
             {customer && (
               <div className="pt-2 border-t border-neutral-800 space-y-1">
-                <p className="text-white font-medium">{customer.name}</p>
-                <p className="text-xs text-neutral-500 font-mono">{customer.email}</p>
-                <p className="text-xs text-neutral-500">{customer.phone}</p>
+                <p className="text-white font-medium">{maskName(customer.name)}</p>
+                <p className="text-xs text-neutral-500 font-mono">{maskEmail(customer.email)}</p>
+                {customer.phone && <p className="text-xs text-neutral-500">{maskPhone(customer.phone)}</p>}
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import { useState, useEffect } from "react"
@@ -584,7 +584,7 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
             Floor Plan interactivo
           </h1>
           <p className="text-neutral-400 text-sm">
-            Diseña la distribución de tu restaurante y gestiona comensales en tiempo real.
+            Diseña la distribución de tu establecimiento y gestiona comensales en tiempo real.
           </p>
         </div>
 
@@ -1483,3 +1483,4 @@ export default function FloorPlanClient({ initialBranches, restaurantId }: Floor
     </div>
   )
 }
+

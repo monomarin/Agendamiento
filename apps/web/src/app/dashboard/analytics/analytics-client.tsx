@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import { useState, useEffect } from "react"
@@ -174,7 +174,7 @@ export default function AnalyticsClient({ restaurantId }: AnalyticsClientProps) 
             Tablero de Analytics
           </h1>
           <p className="text-neutral-400 text-sm">
-            Audita el rendimiento del restaurante, ausencias y flujo de caja estimado.
+            Audita el rendimiento del establecimiento, ausencias y flujo de caja estimado.
           </p>
         </div>
 
@@ -477,3 +477,4 @@ export default function AnalyticsClient({ restaurantId }: AnalyticsClientProps) 
     </div>
   )
 }
+

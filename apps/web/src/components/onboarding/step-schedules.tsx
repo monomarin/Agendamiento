@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import { Clock, Plus, Trash2, ChevronLeft, Copy, Check } from "lucide-react"
@@ -250,7 +250,7 @@ export function StepSchedules() {
           Horarios de Atención
         </h2>
         <p className="text-neutral-400 text-sm">
-          Define los turnos y horas hábiles de tu restaurante. Soporta múltiples turnos por día.
+          Define los turnos y horas hábiles de tu establecimiento. Soporta múltiples turnos por día.
         </p>
       </div>
 
@@ -400,3 +400,4 @@ export function StepSchedules() {
     </div>
   )
 }
+

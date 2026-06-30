@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -104,7 +104,7 @@ export default function RestaurantForm({ restaurant }: RestaurantFormProps) {
           onClick={() => router.push("/admin/restaurantes")}
           className="flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Volver a restaurantes
+          <ArrowLeft className="w-4 h-4" /> Volver a establecimientos
         </button>
         <span className="text-xs text-neutral-500 font-mono">ID: {restaurant.id}</span>
       </div>
@@ -121,7 +121,7 @@ export default function RestaurantForm({ restaurant }: RestaurantFormProps) {
             {formData.name.slice(0, 2).toUpperCase() || "R"}
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">Configuración del Restaurante</h1>
+            <h1 className="text-xl font-bold text-white">Configuración del Establecimiento</h1>
             <p className="text-xs text-neutral-400">Modificar propiedades, diseño e integraciones</p>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function RestaurantForm({ restaurant }: RestaurantFormProps) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-neutral-400 mb-1.5">Nombre del Restaurante</label>
+                <label className="block text-xs font-medium text-neutral-400 mb-1.5">Nombre del Establecimiento</label>
                 <input
                   type="text"
                   name="name"
@@ -365,3 +365,4 @@ export default function RestaurantForm({ restaurant }: RestaurantFormProps) {
     </div>
   )
 }
+

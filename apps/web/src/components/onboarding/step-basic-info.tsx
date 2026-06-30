@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import { useForm } from "react-hook-form"
@@ -11,7 +11,8 @@ import { useOnboardingStore } from "@/lib/onboarding-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BUSINESS_TYPE_GROUPS } from "@/lib/business-types"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -208,7 +209,7 @@ export function StepBasicInfo() {
         <div className="space-y-1">
           <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
             <Store className="w-5 h-5 text-red-500" />
-            Información del Restaurante
+            Información del Establecimiento
           </h2>
           <p className="text-neutral-400 text-sm">
             Ingresa los detalles principales y configura los colores de marca de tu portal público.
@@ -222,7 +223,7 @@ export function StepBasicInfo() {
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre del Restaurante</FormLabel>
+                <FormLabel>Nombre del Establecimiento</FormLabel>
                 <FormControl>
                   <div className="relative">
                     <Input placeholder="Ej. La Cabrera" className="bg-neutral-900 border-neutral-800 text-white pl-9" {...field} />
@@ -296,12 +297,19 @@ export function StepBasicInfo() {
                       <SelectValue placeholder="Selecciona un tipo" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent className="bg-neutral-900 border-neutral-800 text-white">
-                    <SelectItem value="restaurante">Restaurante</SelectItem>
-                    <SelectItem value="bar">Bar</SelectItem>
-                    <SelectItem value="cafe">Café</SelectItem>
-                    <SelectItem value="fast_food">Fast Food</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
+                  <SelectContent className="bg-neutral-900 border-neutral-800 text-white max-h-72 overflow-y-auto">
+                    {BUSINESS_TYPE_GROUPS.map((group) => (
+                      <SelectGroup key={group.category}>
+                        <SelectLabel className="text-[10px] uppercase tracking-widest text-neutral-500 px-2 py-1 font-bold">
+                          {group.category}
+                        </SelectLabel>
+                        {group.types.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -540,7 +548,7 @@ export function StepBasicInfo() {
                       />
                     </FormControl>
                     <FormDescription className="text-[10px] text-neutral-500 mt-1">
-                      Imagen de tu restaurante para el fondo decorativo del portal de reservas.
+                      Imagen de tu establecimiento para el fondo decorativo del portal de reservas.
                     </FormDescription>
                     <FormMessage />
 
@@ -589,3 +597,4 @@ export function StepBasicInfo() {
     </Form>
   )
 }
+

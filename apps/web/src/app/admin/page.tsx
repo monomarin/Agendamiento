@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server"
+﻿import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -63,7 +63,7 @@ export default async function AdminPage() {
 
   const stats = [
     {
-      label: "Restaurantes Totales",
+      label: "Establecimientos Totales",
       value: totalRestaurants,
       sub: `${activeRestaurants} activos`,
       icon: Building2,
@@ -92,7 +92,7 @@ export default async function AdminPage() {
     {
       label: "Plataforma",
       value: activeRestaurants,
-      sub: "restaurantes en línea",
+      sub: "establecimientos en línea",
       icon: Globe,
       color: "text-red-400",
       bg: "bg-red-500/10",
@@ -135,7 +135,7 @@ export default async function AdminPage() {
         <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
           <h2 className="font-semibold text-white flex items-center gap-2">
             <Building2 className="w-4 h-4 text-neutral-400" />
-            Restaurantes Recientes
+            Establecimientos Recientes
           </h2>
           <Link
             href="/admin/restaurantes"
@@ -203,7 +203,7 @@ export default async function AdminPage() {
               {recentRestaurantsWithCounts.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-neutral-600 text-sm">
-                    No hay restaurantes registrados aún.
+                    No hay establecimientos registrados aún.
                   </td>
                 </tr>
               )}
@@ -222,7 +222,7 @@ export default async function AdminPage() {
             <Building2 className="w-5 h-5 text-blue-400" />
           </div>
           <div>
-            <p className="font-semibold text-white text-sm">Gestionar Restaurantes</p>
+            <p className="font-semibold text-white text-sm">Gestionar Establecimientos</p>
             <p className="text-xs text-neutral-500">Ver, activar o suspender</p>
           </div>
         </Link>
@@ -256,3 +256,4 @@ export default async function AdminPage() {
     </div>
   )
 }
+

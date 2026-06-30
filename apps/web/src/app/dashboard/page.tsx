@@ -15,7 +15,19 @@ export default async function DashboardPage() {
 
   const user = await prisma.user.findUnique({
     where: { clerkUserId: userId },
-    select: { restaurantId: true, name: true, restaurant: { select: { slug: true } } },
+    select: {
+      restaurantId: true,
+      name: true,
+      restaurant: {
+        select: {
+          slug: true,
+          branches: {
+            where: { isActive: true },
+            select: { id: true }
+          }
+        }
+      }
+    },
   })
   if (!user?.restaurantId) return null
 
@@ -146,44 +158,55 @@ export default async function DashboardPage() {
       </div>
 
       {/* Integration Links (Module 1) */}
-      <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="font-semibold text-lg text-white flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-red-600/20 text-red-500 flex items-center justify-center">
-                🔗
-              </span>
-              Tu Link Público de Reservas
-            </h2>
-            <p className="text-sm text-neutral-400 mt-1">
-              Comparte este enlace en tus redes sociales o insértalo en tu sitio web.
-            </p>
+      {(() => {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://iagendapp.vercel.app"
+        const slug = user.restaurant?.slug
+        const activeBranches = user.restaurant?.branches || []
+        const bookingLink = activeBranches.length === 1
+          ? `${baseUrl}/${slug}/reservar/personas?branchId=${activeBranches[0].id}`
+          : `${baseUrl}/${slug}/reservar`
+
+        return (
+          <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="font-semibold text-lg text-white flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-red-600/20 text-red-500 flex items-center justify-center">
+                    🔗
+                  </span>
+                  Tu Link Público de Reservas
+                </h2>
+                <p className="text-sm text-neutral-400 mt-1">
+                  Comparte este enlace en tus redes sociales o insértalo en tu sitio web.
+                </p>
+              </div>
+              <a
+                href={bookingLink}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-red-900/20"
+              >
+                Ver página de reservas
+              </a>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+              <div className="p-4 bg-neutral-950 rounded-xl border border-neutral-800">
+                <p className="text-xs font-semibold text-neutral-500 mb-2 uppercase tracking-wider">URL Directa</p>
+                <code className="text-sm text-red-400 break-all select-all font-mono">
+                  {bookingLink}
+                </code>
+              </div>
+              <div className="p-4 bg-neutral-950 rounded-xl border border-neutral-800">
+                <p className="text-xs font-semibold text-neutral-500 mb-2 uppercase tracking-wider">Insertar en tu web (Iframe)</p>
+                <code className="text-xs text-neutral-400 break-all select-all font-mono">
+                  {`<iframe src="${bookingLink}" width="100%" height="800px" frameborder="0"></iframe>`}
+                </code>
+              </div>
+            </div>
           </div>
-          <a
-            href={`/${user.restaurant?.slug}/reservar`}
-            target="_blank"
-            rel="noreferrer"
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-red-900/20"
-          >
-            Ver página de reservas
-          </a>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-          <div className="p-4 bg-neutral-950 rounded-xl border border-neutral-800">
-            <p className="text-xs font-semibold text-neutral-500 mb-2 uppercase tracking-wider">URL Directa</p>
-            <code className="text-sm text-red-400 break-all select-all">
-              https://tu-dominio.com/{user.restaurant?.slug}/reservar
-            </code>
-          </div>
-          <div className="p-4 bg-neutral-950 rounded-xl border border-neutral-800">
-            <p className="text-xs font-semibold text-neutral-500 mb-2 uppercase tracking-wider">Insertar en tu web (Iframe)</p>
-            <code className="text-xs text-neutral-400 break-all select-all">
-              {`<iframe src="https://tu-dominio.com/${user.restaurant?.slug}/reservar" width="100%" height="800px" frameborder="0"></iframe>`}
-            </code>
-          </div>
-        </div>
-      </div>
+        )
+      })()}
 
       {/* Today's Timeline */}
       <div className="space-y-3">

@@ -4,6 +4,8 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Building2, Users, CalendarDays, ExternalLink } from "lucide-react"
 import prisma from "@/lib/prisma"
+import Link from "next/link"
+
 
 export const dynamic = "force-dynamic"
 
@@ -104,14 +106,22 @@ export default async function AdminRestaurantesPage() {
                     {format(new Date(r.createdAt), "dd MMM yyyy", { locale: es })}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <a
-                      href={`/${r.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 text-xs transition-colors"
-                    >
-                      Ver <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/admin/restaurantes/${r.id}`}
+                        className="text-xs text-neutral-400 hover:text-white transition-colors"
+                      >
+                        Configurar
+                      </Link>
+                      <a
+                        href={`/${r.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 text-xs transition-colors border-l border-neutral-800 pl-3"
+                      >
+                        Ver <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))}

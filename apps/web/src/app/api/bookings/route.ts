@@ -108,6 +108,14 @@ export async function POST(req: Request) {
     let confirmationCode: string
 
     const tableType = branch.tableTypes[0]
+    if (!tableType) {
+      if (redis) await redis.del(lockKey)
+      return NextResponse.json(
+        { message: "No hay mesas o áreas disponibles en esta sede para un grupo de " + partySize + " personas." },
+        { status: 400 }
+      )
+    }
+
     const timezone = branch.restaurant.timezone || "America/Bogota"
     const dateTime = parseLocalDateInTimezone(date, time, timezone)
 
@@ -179,7 +187,7 @@ export async function POST(req: Request) {
     const booking = await prisma.booking.create({
       data: {
         branchId,
-        tableTypeId: tableType?.id || branch.tableTypes[0]?.id,
+        tableTypeId: tableType.id,
         customerId: dbCustomer.id,
         calcomBookingId,
         calcomUid,

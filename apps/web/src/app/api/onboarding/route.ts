@@ -58,6 +58,20 @@ export async function POST(req: Request) {
       )
     }
 
+    // Block owners from creating multiple restaurants
+    const dbUser = await prisma.user.findUnique({
+      where: { clerkUserId },
+      select: { restaurantId: true, role: true },
+    })
+
+    if (dbUser?.restaurantId && dbUser.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { message: "No tienes permisos para crear más establecimientos. Solo el Administrador puede hacerlo." },
+        { status: 403 }
+      )
+    }
+
+
     const body = await req.json()
     const { restaurantInfo, schedules, tableTypes, paymentSettings } = body
 

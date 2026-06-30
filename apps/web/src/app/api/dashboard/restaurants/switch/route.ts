@@ -19,14 +19,15 @@ export async function POST(req: Request) {
     // 1. Fetch current user from database
     const dbUser = await prisma.user.findUnique({
       where: { clerkUserId: userId },
-      select: { email: true, name: true },
+      select: { email: true, name: true, role: true },
     })
 
     if (!dbUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const isAdmin = dbUser.email === "admin@iagenda.com" || dbUser.email.endsWith("@iagenda.com")
+    const isAdmin = dbUser.role === "SUPER_ADMIN" || dbUser.email === "admin@iagenda.com" || dbUser.email.endsWith("@iagenda.com")
+
 
     // 2. Fetch the target restaurant
     const restaurant = await prisma.restaurant.findUnique({

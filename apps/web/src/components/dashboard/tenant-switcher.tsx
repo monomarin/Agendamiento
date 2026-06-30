@@ -16,9 +16,10 @@ interface TenantSwitcherProps {
     slug: string
     primaryColor: string
   }
+  isAdmin: boolean
 }
 
-export function TenantSwitcher({ currentRestaurant }: TenantSwitcherProps) {
+export function TenantSwitcher({ currentRestaurant, isAdmin }: TenantSwitcherProps) {
   const [isOpen, setIsOpen] = React.useState(false)
   const [restaurants, setRestaurants] = React.useState<RestaurantSummary[]>([])
   const [loading, setLoading] = React.useState(false)
@@ -146,16 +147,18 @@ export function TenantSwitcher({ currentRestaurant }: TenantSwitcherProps) {
             )}
           </div>
 
-          <div className="border-t border-neutral-800/80 mt-1 pt-1">
-            <button
-              onClick={handleCreateNew}
-              className="w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:text-white transition-all font-semibold"
-              style={{ "--primary": currentRestaurant.primaryColor } as React.CSSProperties}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Agregar establecimiento
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="border-t border-neutral-800/80 mt-1 pt-1">
+              <button
+                onClick={handleCreateNew}
+                className="w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs text-[var(--primary)] hover:bg-[var(--primary)]/10 hover:text-white transition-all font-semibold font-mono"
+                style={{ "--primary": currentRestaurant.primaryColor } as React.CSSProperties}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar establecimiento
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -67,6 +67,10 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   }
 
   const restaurant = user.restaurant
+  const isAdmin = user.role === "SUPER_ADMIN"
+  const navItems = isAdmin
+    ? [{ href: "/admin", iconName: "ShieldCheck", label: "Admin Global" }, ...NAV_ITEMS]
+    : NAV_ITEMS
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex antialiased">
@@ -74,12 +78,12 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       <aside className="hidden lg:flex w-64 flex-col bg-neutral-900/50 border-r border-neutral-800/60 backdrop-blur-xl">
         {/* Brand Switcher */}
         <div className="p-4 border-b border-neutral-800/60">
-          <TenantSwitcher currentRestaurant={restaurant} />
+          <TenantSwitcher currentRestaurant={restaurant} isAdmin={isAdmin} />
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-0.5">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = ICON_MAP[item.iconName] || HelpCircle
             return (
               <Link
@@ -119,7 +123,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
             email: user.email,
             role: user.role,
           }}
-          navItems={NAV_ITEMS}
+          navItems={navItems}
         />
 
         {/* Content */}
@@ -130,3 +134,4 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     </div>
   )
 }
+

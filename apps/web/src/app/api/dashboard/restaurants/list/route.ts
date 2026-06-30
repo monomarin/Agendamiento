@@ -9,17 +9,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // 1. Fetch current user to determine role/admin status
     const dbUser = await prisma.user.findUnique({
       where: { clerkUserId: userId },
-      select: { email: true },
+      select: { email: true, role: true },
     })
 
     if (!dbUser) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    const isAdmin = dbUser.email === "admin@iagenda.com" || dbUser.email.endsWith("@iagenda.com")
+    const isAdmin = dbUser.role === "SUPER_ADMIN" || dbUser.email === "admin@iagenda.com" || dbUser.email.endsWith("@iagenda.com")
+
 
     let restaurants = []
 

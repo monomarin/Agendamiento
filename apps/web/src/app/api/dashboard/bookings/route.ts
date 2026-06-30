@@ -146,12 +146,15 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    const confirmationCode = Math.random().toString(36).slice(2, 10).toUpperCase()
+
     // Create booking
     const booking = await prisma.booking.create({
       data: {
         branchId,
         tableTypeId,
         customerId: dbCustomer.id,
+        confirmationCode,
         dateTime: new Date(dateTime),
         partySize: Number(partySize),
         specialRequests: specialRequests || null,

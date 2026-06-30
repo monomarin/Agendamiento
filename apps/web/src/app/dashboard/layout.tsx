@@ -6,7 +6,7 @@ import { auth } from "@clerk/nextjs/server"
 import { UserButton } from "@clerk/nextjs"
 import {
   CalendarDays, Users, LayoutGrid, Settings, BarChart3,
-  MessageSquare, ShieldCheck, Menu, HelpCircle,
+  MessageSquare, ShieldCheck, Menu, HelpCircle, ScanQrCode,
 } from "lucide-react"
 
 import prisma from "@/lib/prisma"
@@ -25,10 +25,12 @@ const ICON_MAP: Record<string, any> = {
   BarChart3,
   MessageSquare,
   ShieldCheck,
+  ScanQrCode,
 }
 
 const NAV_ITEMS = [
   { href: "/dashboard", iconName: "CalendarDays", label: "Reservas" },
+  { href: "/dashboard/verificar", iconName: "ScanQrCode", label: "Verificar Reserva" },
   { href: "/dashboard/clientes", iconName: "Users", label: "Clientes" },
   { href: "/dashboard/mesas", iconName: "LayoutGrid", label: "Floor Plan" },
   { href: "/dashboard/conversaciones", iconName: "MessageSquare", label: "Conversaciones" },

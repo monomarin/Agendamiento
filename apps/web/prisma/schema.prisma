@@ -258,6 +258,7 @@ model Booking {
   calcomUid       String?       @unique
   
   // Reservation details
+  confirmationCode String?      @unique
   dateTime        DateTime
   partySize       Int
   duration        Int           @default(90) // minutes

@@ -39,7 +39,7 @@ export default function ConfirmacionPage({ params }: ConfirmacionPageProps) {
   // Generate QR code URL using a public service
   React.useEffect(() => {
     if (!bookingId) return
-    const bookingUrl = `${window.location.origin}/${slug}/reservar/confirmacion?ref=${bookingId}`
+    const bookingUrl = `${window.location.origin}/${slug}/reservar/consulta?ref=${bookingId}`
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(bookingUrl)}&color=FFFFFF&bgcolor=0A0A0A&margin=2`
     setQrUrl(qrApiUrl)
   }, [bookingId, slug])

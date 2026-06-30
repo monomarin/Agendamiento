@@ -183,6 +183,7 @@ export async function POST(req: Request) {
         customerId: dbCustomer.id,
         calcomBookingId,
         calcomUid,
+        confirmationCode,
         dateTime,
         partySize,
         duration: 90,
